@@ -382,21 +382,42 @@ async def run_ingest(sources: list[str] | None = None, embed: bool = True) -> No
                 fetchers.append(await wrap_ats(ats_name, cls, board_list))
 
         totals["sources_started"] = len(fetchers)
-        logger.info("Fetching %s sources in parallel…", len(fetchers))
-        started = {name: datetime.now(timezone.utc) for name, _ in fetchers}
+        # Run one source at a time (feeds first, then ATS). Inside each collector
+        # board concurrency still applies via INGEST_CONCURRENCY.
+        # Parallel source-start was starving/killing long Greenhouse/Ashby runs on
+        # small Render instances before they could finish recording jobs.
+        feed_order = (
+            "remotive",
+            "remoteok",
+            "jobicy",
+            "himalayas",
+            "arbeitnow",
+            "themuse",
+            "weworkremotely",
+            "remotejobsorg",
+        )
+        order_index = {name: i for i, name in enumerate(feed_order)}
+        fetchers.sort(key=lambda pair: (0 if pair[0] in order_index else 1, order_index.get(pair[0], 99), pair[0]))
 
-        async def fetch_named(name: str, fn) -> tuple[str, list[NormalizedJob] | None, Exception | None]:
+        logger.info(
+            "Fetching %s sources sequentially (feeds first, then company ATS boards)…",
+            len(fetchers),
+        )
+        started: dict[str, datetime] = {}
+
+        async def fetch_named(
+            name: str, fn
+        ) -> tuple[str, list[NormalizedJob] | None, Exception | None]:
             try:
                 return name, await fn(), None
             except Exception as exc:  # noqa: BLE001
                 return name, None, exc
 
-        pending = [asyncio.create_task(fetch_named(name, fn)) for name, fn in fetchers]
-
-        # Serial batched upserts (fast chunks, one session — no pool races)
         successful_sources: list[str] = []
-        for completed in asyncio.as_completed(pending):
-            name, result, fetch_error = await completed
+        for name, fn in fetchers:
+            started[name] = datetime.now(timezone.utc)
+            logger.info("Source %s starting…", name)
+            name, result, fetch_error = await fetch_named(name, fn)
             if fetch_error is not None:
                 totals["sources_failed"] += 1
                 logger.error("Source %s failed: %s", name, fetch_error)
