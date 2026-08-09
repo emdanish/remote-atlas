@@ -1,0 +1,6 @@
+# Heavy deps for ingestion / embedding only (Render Cron + local full crawl).
+# Do not install on the free-tier API web service.
+-r requirements.txt
+fastembed>=0.4.0
+pytest>=8.0.0
+pytest-asyncio>=0.24.0

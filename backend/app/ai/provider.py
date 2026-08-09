@@ -33,7 +33,10 @@ _GEMINI_CHAT_MODELS = (
 def embedding_provider_name() -> str | None:
     """Resolve one vector space before embedding; mixed vectors are invalid."""
     settings = get_settings()
-    mode = (settings.embed_provider or "auto").lower()
+    mode = (settings.embed_provider or "auto").lower().strip()
+    # Web free-tier: never load ONNX / BGE in-process
+    if mode in {"none", "off", "fts", "disabled", "false", "0"}:
+        return None
     if mode == "local":
         from app.search.local_embeddings import local_available
 
@@ -143,16 +146,24 @@ def _is_auth_failure(exc: BaseException) -> bool:
 
 
 async def embed_texts(texts: list[str]) -> list[list[float]]:
-    """Embed texts. Provider: gemini / local / auto (config)."""
+    """Embed texts. Provider: gemini / local / auto / none (config)."""
     settings = get_settings()
     if not texts:
+        return []
+
+    mode = (settings.embed_provider or "auto").lower().strip()
+    if mode in {"none", "off", "fts", "disabled", "false", "0"}:
         return []
 
     provider = embedding_provider_name()
     if provider == "local:bge-base-en-v1.5":
         from app.search.local_embeddings import local_embed_texts
 
-        return await local_embed_texts(texts)
+        try:
+            return await local_embed_texts(texts)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Local embedding failed (use FTS fallback): %s", exc)
+            return []
 
     if provider == "gemini:embedding-001":
         last_error: Optional[Exception] = None
@@ -162,20 +173,20 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Embedding fallback — gemini_%s: %s", idx, exc)
                 last_error = exc
-        if provider == "gemini:embedding-001":
-            if last_error:
-                logger.error("All Gemini embedding keys failed: %s", last_error)
-            return []
+        if last_error:
+            logger.error("All Gemini embedding keys failed: %s", last_error)
+        return []
 
-    # auto fallback → local
-    try:
-        from app.search.local_embeddings import local_available, local_embed_texts
+    # auto: try local only when explicitly available and mode is auto
+    if mode == "auto":
+        try:
+            from app.search.local_embeddings import local_available, local_embed_texts
 
-        if provider is None and local_available():
-            logger.info("Using local embeddings (Gemini unavailable or exhausted)")
-            return await local_embed_texts(texts)
-    except Exception as exc:  # noqa: BLE001
-        logger.error("Local embedding failed: %s", exc)
+            if local_available():
+                logger.info("Using local embeddings (auto)")
+                return await local_embed_texts(texts)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Local embedding failed: %s", exc)
     return []
 
 

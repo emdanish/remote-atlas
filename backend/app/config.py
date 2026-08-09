@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     ingest_concurrency: int = 24
     embedding_dimensions: int = 768
     embed_batch_size: int = 800
-    # gemini | local | auto (auto prefers the free local provider when installed)
+    # gemini | local | auto | none/off/fts (none = never load local models; FTS-only search)
     embed_provider: str = "local"
     embed_max_consecutive_failures: int = 3
     companies_path: str = str(BACKEND_ROOT / "data" / "companies.yaml")

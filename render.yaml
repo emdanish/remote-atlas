@@ -5,6 +5,7 @@ services:
     plan: free
     region: singapore
     rootDir: backend
+    # Keep lean — no fastembed/ONNX (would OOM free 512MB).
     buildCommand: pip install --upgrade pip && pip install -r requirements.txt
     startCommand: python -m app.deploy web
     healthCheckPath: /health/ready
@@ -24,13 +25,14 @@ services:
       - key: CORS_ORIGINS
         sync: false
       - key: DATABASE_POOL_SIZE
-        value: "5"
+        value: "3"
       - key: DATABASE_MAX_OVERFLOW
-        value: "5"
+        value: "2"
       - key: FRESHNESS_DAYS
         value: "14"
+      # Never load BGE/ONNX on the free web dyno (cron embeds jobs offline).
       - key: EMBED_PROVIDER
-        value: local
+        value: none
       - key: GEMINI_API_KEY_1
         sync: false
       - key: GEMINI_API_KEY_2
@@ -49,7 +51,7 @@ services:
     region: singapore
     rootDir: backend
     schedule: "0 1 * * *"
-    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    buildCommand: pip install --upgrade pip && pip install -r requirements-ingest.txt
     startCommand: python -m app.deploy cron --embed
     autoDeployTrigger: commit
     envVars:
