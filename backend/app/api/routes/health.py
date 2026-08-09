@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,18 +10,37 @@ from app.schemas import HealthResponse
 router = APIRouter(tags=["health"])
 
 
-@router.get("/health", response_model=HealthResponse)
-async def health(db: AsyncSession = Depends(get_db)) -> HealthResponse:
-    """Liveness probe. Always reachable if the process is up; database status is reported separately."""
+async def _check_db(db: AsyncSession) -> str:
     try:
         await db.execute(text("SELECT 1"))
-        return HealthResponse(status="ok", database="ok")
+        return "ok"
     except Exception:  # noqa: BLE001
-        return HealthResponse(status="degraded", database="error")
+        return "error"
 
 
-@router.get("/health/ready", response_model=HealthResponse)
-async def readiness(db: AsyncSession = Depends(get_db)) -> HealthResponse:
+@router.api_route("/health", methods=["GET", "HEAD"], response_model=None)
+async def health(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> HealthResponse | Response:
+    """
+    Liveness probe. Supports GET and HEAD so free keep-alive monitors
+    (e.g. UptimeRobot default HEAD) do not get 405 Method Not Allowed.
+    """
+    database = await _check_db(db)
+    status_value = "ok" if database == "ok" else "degraded"
+    if request.method == "HEAD":
+        # Empty body; 200 is enough for uptime keepers. Degraded still returns 200
+        # so the free-tier dyno is considered alive (liveness, not readiness).
+        return Response(status_code=200, media_type="application/json")
+    return HealthResponse(status=status_value, database=database)
+
+
+@router.api_route("/health/ready", methods=["GET", "HEAD"], response_model=None)
+async def readiness(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> HealthResponse | Response:
     """Return a failing status code when the API cannot serve database-backed traffic."""
     try:
         await db.execute(text("SELECT 1"))
@@ -36,6 +55,8 @@ async def readiness(db: AsyncSession = Depends(get_db)) -> HealthResponse:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database unavailable",
         ) from exc
+    if request.method == "HEAD":
+        return Response(status_code=200, media_type="application/json")
     return HealthResponse(status="ok", database="ok")
 
 
