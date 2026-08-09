@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ChevronRight, MapPin } from "lucide-react";
 import { FitBriefPanel } from "@/components/jobs/FitBriefPanel";
 import { TailorResumePanel } from "@/components/jobs/TailorResumePanel";
+import { JobDescription } from "@/components/jobs/JobDescription";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { JobCard } from "@/components/jobs/JobCard";
@@ -19,6 +20,7 @@ import {
   jobSeoTitle,
   safeJsonLd,
 } from "@/lib/seo";
+import { companySeoHref, skillSeoHref } from "@/lib/seoTaxonomy";
 import {
   formatRelativeDate,
   officialApplyUrl,
@@ -160,7 +162,12 @@ export default async function JobDetailPage({ params }: Props) {
             {job.title}
           </h1>
           <p className="mt-2 text-lg font-medium text-ink/80" itemProp="hiringOrganization">
-            {job.company_name}
+            <Link
+              href={companySeoHref(job.company_name)}
+              className="hover:text-accent hover:underline"
+            >
+              {job.company_name}
+            </Link>
           </p>
           <div className="mt-3 flex flex-wrap gap-4 text-sm text-muted">
             {job.location_raw ? (
@@ -176,27 +183,25 @@ export default async function JobDetailPage({ params }: Props) {
 
           {tags.length ? (
             <ul className="mt-6 flex flex-wrap gap-2" aria-label="Skills and technologies">
-              {tags.map((t) => (
-                <li
-                  key={t.toLowerCase()}
-                  className="rounded-md border border-line bg-paper px-2.5 py-1 text-xs font-medium text-muted"
-                >
-                  <Link
-                    href={`/jobs?skills=${encodeURIComponent(t)}`}
-                    className="hover:text-accent"
+              {tags.map((t) => {
+                const seoHref = skillSeoHref(t);
+                const href = seoHref || `/jobs?skills=${encodeURIComponent(t)}`;
+                return (
+                  <li
+                    key={t.toLowerCase()}
+                    className="rounded-md border border-line bg-paper px-2.5 py-1 text-xs font-medium text-muted"
                   >
-                    {t}
-                  </Link>
-                </li>
-              ))}
+                    <Link href={href} className="hover:text-accent">
+                      {t}
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
           ) : null}
 
-          <div
-            className="prose-atlas mt-10 whitespace-pre-wrap text-[15px] leading-relaxed text-ink/90"
-            itemProp="description"
-          >
-            {job.description_text || "No description provided by the source."}
+          <div className="mt-10" itemProp="description">
+            <JobDescription html={job.description_html} text={job.description_text} />
           </div>
 
           <div className="mt-10">

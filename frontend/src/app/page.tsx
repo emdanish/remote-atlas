@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Reveal } from "@/components/marketing/Reveal";
 import { StatCounter } from "@/components/marketing/StatCounter";
-import { getIngestStats } from "@/lib/api";
+import { getIngestStats, getSeoLocations, getSeoSkills } from "@/lib/api";
 import { safeJsonLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
@@ -90,6 +90,21 @@ export default async function LandingPage() {
       },
     })),
   };
+
+  let explore: { skills: { href: string; label: string; count: number }[]; locations: { href: string; label: string; count: number }[] } =
+    { skills: [], locations: [] };
+  try {
+    const [skills, countries] = await Promise.all([
+      getSeoSkills(8),
+      getSeoLocations("country"),
+    ]);
+    explore = {
+      skills: skills.slice(0, 8),
+      locations: countries.slice(0, 6),
+    };
+  } catch {
+    /* optional hub */
+  }
 
   return (
     <div>
@@ -177,6 +192,62 @@ export default async function LandingPage() {
           </div>
         </div>
       </section>
+
+      {(explore.skills.length > 0 || explore.locations.length > 0) && (
+        <section className="border-b border-line bg-paper" aria-labelledby="explore-heading">
+          <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-14">
+            <p className="text-xs font-bold tracking-[0.18em] text-accent">EXPLORE</p>
+            <h2 id="explore-heading" className="mt-2 font-display text-2xl font-semibold text-ink">
+              Popular remote paths
+            </h2>
+            <p className="mt-2 max-w-xl text-sm text-muted">
+              Curated landings with enough fresh inventory to be useful — not every filter
+              combination.
+            </p>
+            {explore.skills.length ? (
+              <div className="mt-8">
+                <h3 className="text-sm font-semibold text-ink">By skill</h3>
+                <ul className="mt-3 flex flex-wrap gap-2">
+                  {explore.skills.map((s) => (
+                    <li key={s.href}>
+                      <Link
+                        href={s.href}
+                        className="inline-flex rounded-md border border-line bg-elevated px-3 py-1.5 text-sm font-medium text-ink hover:border-accent hover:text-accent"
+                      >
+                        {s.label}
+                        <span className="ml-1.5 text-muted">({s.count})</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {explore.locations.length ? (
+              <div className="mt-8">
+                <h3 className="text-sm font-semibold text-ink">By location signal</h3>
+                <ul className="mt-3 flex flex-wrap gap-2">
+                  {explore.locations.map((s) => (
+                    <li key={s.href}>
+                      <Link
+                        href={s.href}
+                        className="inline-flex rounded-md border border-line bg-elevated px-3 py-1.5 text-sm font-medium text-ink hover:border-accent hover:text-accent"
+                      >
+                        {s.label}
+                        <span className="ml-1.5 text-muted">({s.count})</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            <p className="mt-6">
+              <Link href="/companies" className="text-sm font-semibold text-accent hover:underline">
+                Browse companies →
+              </Link>
+            </p>
+          </div>
+        </section>
+      )}
 
       {/* Product promise */}
       <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-24">

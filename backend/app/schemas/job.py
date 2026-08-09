@@ -26,11 +26,12 @@ class JobOut(BaseModel):
     last_seen_at: datetime
     is_active: bool
     description_text: Optional[str] = None
+    # Source HTML when available; clients must sanitize before rendering.
+    description_html: Optional[str] = None
     score: Optional[float] = None
     source_kind: Optional[str] = None
     source_kind_label: Optional[str] = None
     match_reasons: list[str] = Field(default_factory=list)
-    # Explainable fit ledger (0–100 factors) when ranked for a profile
     match_breakdown: Optional[dict] = None
 
 
@@ -55,6 +56,29 @@ class SitemapEntriesResponse(BaseModel):
     page_size: int
     freshness_days: int
     entries: list[SitemapJobEntry]
+
+
+class TitleSuggestion(BaseModel):
+    title: str
+    count: int
+
+
+class TitleSuggestionsResponse(BaseModel):
+    query: str
+    suggestions: list[TitleSuggestion]
+
+
+class SeoTaxonomyItem(BaseModel):
+    slug: str
+    label: str
+    count: int
+    kind: str  # skill | company | country | city
+    href: str
+
+
+class SeoTaxonomyListResponse(BaseModel):
+    freshness_days: int
+    items: list[SeoTaxonomyItem]
 
 
 class HealthResponse(BaseModel):

@@ -3,7 +3,10 @@ import { Logo } from "@/components/brand/Logo";
 
 const productLinks = [
   { href: "/jobs", label: "Browse jobs" },
-  { href: "/jobs?workplace=remote", label: "Remote roles" },
+  { href: "/remote-javascript-jobs", label: "JavaScript remote" },
+  { href: "/remote-python-jobs", label: "Python remote" },
+  { href: "/companies", label: "Companies" },
+  { href: "/remote-jobs/pakistan", label: "Pakistan-friendly remote" },
   { href: "/register", label: "Create account" },
   { href: "/login", label: "Sign in" },
 ];

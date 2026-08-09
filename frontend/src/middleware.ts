@@ -12,12 +12,24 @@ const PRIVATE_PREFIXES = [
 ];
 
 /**
- * Crawler hints that complement robots.txt + page metadata:
- * - Faceted job search URLs: noindex (canonical consolidates to /jobs)
- * - Private/auth routes: noindex, nofollow
+ * - Rewrite /remote-{skill}-jobs → /seo/skills/{skill} (Remote OK–style public URLs)
+ * - Faceted /jobs?* : noindex,follow
+ * - Private routes: noindex,nofollow
  */
 export function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
+
+  const skillMatch = pathname.match(/^\/remote-([a-z0-9-]+)-jobs\/?$/i);
+  if (skillMatch) {
+    const skill = skillMatch[1].toLowerCase();
+    // Avoid catching /remote-jobs-… if ever added; require slug not empty
+    if (skill && skill !== "jobs") {
+      const url = request.nextUrl.clone();
+      url.pathname = `/seo/skills/${skill}`;
+      return NextResponse.rewrite(url);
+    }
+  }
+
   const response = NextResponse.next();
 
   if (pathname === "/jobs" && searchParams.toString().length > 0) {
@@ -34,6 +46,7 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    "/remote-:path*",
     "/jobs",
     "/profile/:path*",
     "/saved/:path*",

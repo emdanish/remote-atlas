@@ -9,11 +9,13 @@ from app.api.routes import (
     resume_tailor,
     saved_jobs,
     saved_searches,
+    seo,
 )
 
 api_router = APIRouter()
 api_router.include_router(health.router)
 api_router.include_router(jobs.router)
+api_router.include_router(seo.router)
 api_router.include_router(auth.router)
 api_router.include_router(saved_jobs.router)
 api_router.include_router(saved_searches.router)

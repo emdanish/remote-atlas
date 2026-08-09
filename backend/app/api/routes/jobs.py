@@ -115,7 +115,8 @@ async def jobs_search(
         if not is_fresh(job, settings.freshness_days):
             continue
         item = _job_out(job, score)
-        # Keep list payload lighter
+        # Keep list payload lighter — full HTML only on job detail.
+        item.description_html = None
         if item.description_text and len(item.description_text) > 500:
             item.description_text = item.description_text[:500] + "…"
         results.append(item)

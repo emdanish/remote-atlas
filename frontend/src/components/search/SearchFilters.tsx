@@ -4,6 +4,7 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { TitleAutocomplete } from "@/components/search/TitleAutocomplete";
 import { cn } from "@/lib/utils";
 import {
   catalogTechsExcluding,
@@ -191,13 +192,14 @@ export function SearchFilters({
         <label htmlFor="q" className="mb-1.5 block text-sm font-medium text-ink">
           Search
         </label>
-        <Input
+        <TitleAutocomplete
           id="q"
           name="q"
           value={value.q}
-          onChange={(e) => set("q", e.target.value)}
+          onChange={(q) => set("q", q)}
+          onSubmit={() => onSubmit()}
           placeholder='e.g. “Senior React engineer”, “Python backend”, or “data engineer”'
-          autoComplete="off"
+          inputClassName="flex h-10 w-full rounded-md border border-line bg-elevated px-3 text-sm text-ink outline-none ring-accent placeholder:text-muted focus:ring-2"
         />
       </div>
 

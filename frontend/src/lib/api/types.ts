@@ -31,6 +31,7 @@ export type Job = {
   last_seen_at?: string;
   is_active?: boolean;
   description_text?: string | null;
+  description_html?: string | null;
   score?: number | null;
   source_kind?: string | null;
   source_kind_label?: string | null;

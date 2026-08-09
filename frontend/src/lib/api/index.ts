@@ -6,3 +6,4 @@ export * from "./saved";
 export * from "./stats";
 export * from "./resume";
 export * from "./sitemap";
+export * from "./seo";
