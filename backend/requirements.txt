@@ -1,4 +1,6 @@
 fastapi>=0.115.0
+# Required for UploadFile / multipart resume uploads (FastAPI File(...))
+python-multipart>=0.0.12
 uvicorn[standard]>=0.32.0
 sqlalchemy[asyncio]>=2.0.36
 asyncpg>=0.30.0
