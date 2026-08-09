@@ -1,60 +1,70 @@
 import type { MetadataRoute } from "next";
 import { getSitemapEntries, SITE_URL } from "@/lib/api";
 
-/** Google sitemap limit is 50k URLs; keep jobs chunk under that with headroom for static. */
-const JOBS_PER_SITEMAP = 5000;
+/**
+ * Single metadata route at /sitemap.xml (Next.js 15 Metadata API).
+ *
+ * Important: do NOT use generateSitemaps() here — that maps only to
+ * /sitemap/[id].xml and leaves /sitemap.xml as 404 in production.
+ *
+ * Google limit: 50,000 URLs per sitemap. We page the sitemap-entries API
+ * until empty or that cap (today's index is well under it).
+ */
+const PAGE_SIZE = 5000;
+const MAX_URLS = 50_000;
 
 export const revalidate = 3600;
 
-/**
- * Number of sitemap chunks. id=0 is static pages + first job page;
- * higher ids are job-only chunks.
- */
-export async function generateSitemaps() {
-  try {
-    const head = await getSitemapEntries(1, 1);
-    const jobPages = Math.max(1, Math.ceil(head.total / JOBS_PER_SITEMAP));
-    // Always emit at least 0; extra job shards are 1..jobPages-1 when needed
-    const n = Math.max(1, jobPages);
-    return Array.from({ length: n }, (_, id) => ({ id }));
-  } catch {
-    return [{ id: 0 }];
-  }
-}
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const staticRoutes: MetadataRoute.Sitemap = [
+    {
+      url: SITE_URL,
+      lastModified: new Date(),
+      changeFrequency: "daily",
+      priority: 1,
+    },
+    {
+      url: `${SITE_URL}/jobs`,
+      lastModified: new Date(),
+      changeFrequency: "hourly",
+      priority: 0.9,
+    },
+  ];
 
-export default async function sitemap(props: {
-  id: number | Promise<number>;
-}): Promise<MetadataRoute.Sitemap> {
-  const id = await Promise.resolve(props.id);
-  const staticRoutes: MetadataRoute.Sitemap =
-    id === 0
-      ? [
-          {
-            url: SITE_URL,
-            lastModified: new Date(),
-            changeFrequency: "daily",
-            priority: 1,
-          },
-          {
-            url: `${SITE_URL}/jobs`,
-            lastModified: new Date(),
-            changeFrequency: "hourly",
-            priority: 0.9,
-          },
-        ]
-      : [];
+  const jobRoutes: MetadataRoute.Sitemap = [];
 
   try {
-    const page = id + 1; // API is 1-based
-    const res = await getSitemapEntries(page, JOBS_PER_SITEMAP);
-    const jobRoutes: MetadataRoute.Sitemap = res.entries.map((entry) => ({
-      url: `${SITE_URL}/jobs/${entry.id}`,
-      lastModified: entry.last_modified ? new Date(entry.last_modified) : new Date(),
-      changeFrequency: "daily" as const,
-      priority: 0.7,
-    }));
-    return [...staticRoutes, ...jobRoutes];
+    let page = 1;
+    let total = Infinity;
+
+    while (jobRoutes.length + staticRoutes.length < MAX_URLS) {
+      const remaining = MAX_URLS - staticRoutes.length - jobRoutes.length;
+      const pageSize = Math.min(PAGE_SIZE, remaining);
+      if (pageSize <= 0) break;
+
+      const res = await getSitemapEntries(page, pageSize);
+      total = res.total;
+
+      for (const entry of res.entries) {
+        jobRoutes.push({
+          url: `${SITE_URL}/jobs/${entry.id}`,
+          lastModified: entry.last_modified
+            ? new Date(entry.last_modified)
+            : new Date(),
+          changeFrequency: "daily",
+          priority: 0.7,
+        });
+      }
+
+      if (!res.entries.length) break;
+      if (page * pageSize >= total) break;
+      page += 1;
+      // Safety: avoid pathological loops
+      if (page > 20) break;
+    }
   } catch {
-    return staticRoutes;
+    // Sitemap still returns core public routes if the API is briefly down.
   }
+
+  return [...staticRoutes, ...jobRoutes];
 }
