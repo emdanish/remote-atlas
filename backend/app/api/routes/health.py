@@ -26,6 +26,12 @@ async def readiness(db: AsyncSession = Depends(get_db)) -> HealthResponse:
     try:
         await db.execute(text("SELECT 1"))
     except Exception as exc:  # noqa: BLE001
+        # Log type/message only — never the connection string
+        import logging
+
+        logging.getLogger("health").error(
+            "readiness database check failed: %s: %s", type(exc).__name__, exc
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database unavailable",
