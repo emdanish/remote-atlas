@@ -1,0 +1,70 @@
+services:
+  - type: web
+    name: remote-atlas-api
+    runtime: python
+    plan: free
+    region: singapore
+    rootDir: backend
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: python -m app.deploy web
+    healthCheckPath: /health/ready
+    autoDeployTrigger: commit
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_URL_SYNC
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: AUTH_COOKIE_SECURE
+        value: "true"
+      - key: AUTH_COOKIE_SAMESITE
+        value: lax
+      - key: CORS_ORIGINS
+        sync: false
+      - key: DATABASE_POOL_SIZE
+        value: "5"
+      - key: DATABASE_MAX_OVERFLOW
+        value: "5"
+      - key: FRESHNESS_DAYS
+        value: "14"
+      - key: EMBED_PROVIDER
+        value: local
+      - key: GEMINI_API_KEY_1
+        sync: false
+      - key: GEMINI_API_KEY_2
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: PERPLEXITY_API_KEY
+        sync: false
+
+  # Daily scheduled ingest via Render Cron Job (exits when finished; ~$1/mo minimum).
+  # Prefer this over a always-on background worker for a once-per-day crawl.
+  - type: cron
+    name: remote-atlas-ingest
+    runtime: python
+    plan: starter
+    region: singapore
+    rootDir: backend
+    schedule: "0 6 * * *"
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: python -m app.deploy cron
+    autoDeployTrigger: commit
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_URL_SYNC
+        sync: false
+      - key: FRESHNESS_DAYS
+        value: "14"
+      - key: INGEST_CONCURRENCY
+        value: "8"
+      - key: EMBED_PROVIDER
+        value: local
+      - key: THE_MUSE_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY_1
+        sync: false
+      - key: GEMINI_API_KEY_2
+        sync: false

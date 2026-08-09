@@ -1,0 +1,1 @@
+"""Remote Atlas application package."""
