@@ -4,6 +4,19 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   compress: true,
+  async rewrites() {
+    // Public Remote-OK style skill URLs are a single path segment.
+    // Middleware alone is insufficient if matchers are invalid; rewrites
+    // map reliably on Vercel before the filesystem/router 404s.
+    return {
+      beforeFiles: [
+        {
+          source: "/remote-:skill-jobs",
+          destination: "/seo/skills/:skill",
+        },
+      ],
+    };
+  },
   async headers() {
     return [
       {
@@ -20,7 +33,6 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Help crawlers cache robots/sitemap sensibly
         source: "/robots.txt",
         headers: [
           {

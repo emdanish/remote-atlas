@@ -12,17 +12,19 @@ const PRIVATE_PREFIXES = [
 ];
 
 /**
- * - Rewrite /remote-{skill}-jobs → /seo/skills/{skill} (Remote OK–style public URLs)
+ * - Rewrite /remote-{skill}-jobs → /seo/skills/{skill} (defense in depth with next.config)
  * - Faceted /jobs?* : noindex,follow
  * - Private routes: noindex,nofollow
+ *
+ * IMPORTANT: matcher must use a path-to-regexp pattern that actually compiles.
+ * `/remote-:path*` is INVALID and previously caused all skill public URLs to 404.
  */
 export function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
 
-  const skillMatch = pathname.match(/^\/remote-([a-z0-9-]+)-jobs\/?$/i);
+  const skillMatch = pathname.match(/^\/remote-([a-z0-9]+(?:-[a-z0-9]+)*)-jobs\/?$/i);
   if (skillMatch) {
     const skill = skillMatch[1].toLowerCase();
-    // Avoid catching /remote-jobs-… if ever added; require slug not empty
     if (skill && skill !== "jobs") {
       const url = request.nextUrl.clone();
       url.pathname = `/seo/skills/${skill}`;
@@ -46,7 +48,8 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/remote-:path*",
+    // Compiles to /^\/remote-([^\/#\?]+?)-jobs[\/#\?]?$/i
+    "/remote-:skill-jobs",
     "/jobs",
     "/profile/:path*",
     "/saved/:path*",

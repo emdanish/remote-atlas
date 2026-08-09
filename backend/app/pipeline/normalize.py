@@ -1,13 +1,17 @@
 from __future__ import annotations
 
-import html
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
-from bs4 import BeautifulSoup
+from app.pipeline.description import (
+    html_to_text,
+    looks_like_encoded_html,
+    looks_like_html,
+    normalize_job_description_fields,
+)
 
 # Tracking / session params that create false-unique apply URLs
 _STRIP_QUERY_KEYS = frozenset(
@@ -33,6 +37,8 @@ _STRIP_QUERY_KEYS = frozenset(
     }
 )
 
+_WS_RE = re.compile(r"\s+")
+
 
 @dataclass
 class NormalizedJob:
@@ -55,18 +61,21 @@ class NormalizedJob:
     company_id: Optional[int] = None
 
 
-_TAG_RE = re.compile(r"<[^>]+>")
-_WS_RE = re.compile(r"\s+")
-
-
-def html_to_text(value: Optional[str]) -> Optional[str]:
-    if not value:
-        return None
-    decoded = html.unescape(value)
-    soup = BeautifulSoup(decoded, "lxml")
-    text = soup.get_text(separator=" ", strip=True)
-    text = _WS_RE.sub(" ", text).strip()
-    return text or None
+# Re-export description helpers for collectors
+__all__ = [
+    "NormalizedJob",
+    "html_to_text",
+    "normalize_url",
+    "canonical_apply_url",
+    "parse_datetime",
+    "infer_workplace_type",
+    "infer_career_stage",
+    "fingerprint",
+    "apply_url_is_usable",
+    "normalize_job_description_fields",
+    "looks_like_html",
+    "looks_like_encoded_html",
+]
 
 
 def normalize_url(url: Optional[str]) -> Optional[str]:

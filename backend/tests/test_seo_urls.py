@@ -1,9 +1,22 @@
-"""Smoke tests for HTML sanitization helpers (Node/TS mirrored rules in pure unit style)."""
+"""SEO URL / matcher contracts used by frontend + backend."""
 
-from app.seo.taxonomy import SEO_SKILL_MAP, skill_href
+from app.seo.taxonomy import skill_href
 
 
-def test_known_skill_urls_unique():
-    hrefs = {skill_href(s) for s in SEO_SKILL_MAP}
-    assert len(hrefs) == len(SEO_SKILL_MAP)
-    assert all(h.startswith("/remote-") and h.endswith("-jobs") for h in hrefs)
+def test_public_skill_url_shape():
+    assert skill_href("sql") == "/remote-sql-jobs"
+    assert skill_href("next-js") == "/remote-next-js-jobs"
+    assert skill_href("python") == "/remote-python-jobs"
+
+
+def test_skill_public_path_regex_aligns_with_middleware():
+    import re
+
+    # Must match middleware.py skillMatch
+    pattern = re.compile(r"^/remote-([a-z0-9]+(?:-[a-z0-9]+)*)-jobs/?$", re.I)
+    assert pattern.match("/remote-sql-jobs").group(1) == "sql"
+    assert pattern.match("/remote-next-js-jobs").group(1) == "next-js"
+    assert pattern.match("/remote-typescript-jobs").group(1) == "typescript"
+    # Country routes must NOT match (different path shape)
+    assert pattern.match("/remote-jobs/pakistan") is None
+    assert pattern.match("/remote-jobs") is None

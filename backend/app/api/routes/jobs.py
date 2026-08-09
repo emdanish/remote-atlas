@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.db.session import get_db
 from app.models import Job
+from app.pipeline.description import normalize_job_description_fields
 from app.pipeline.freshness import freshness_cutoff, is_fresh
 from app.pipeline.source_trust import source_kind, source_kind_label
 from app.schemas import JobOut, JobSearchResponse, SitemapEntriesResponse, SitemapJobEntry
@@ -18,7 +19,7 @@ from app.security import enforce_rate_limit
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
-def _job_out(job: Job, score: float | None = None) -> JobOut:
+def _job_out(job: Job, score: float | None = None, *, full_description: bool = True) -> JobOut:
     item = JobOut.model_validate(job)
     item.skills = job.skills or []
     item.tech_tags = job.tech_tags or []
@@ -26,6 +27,16 @@ def _job_out(job: Job, score: float | None = None) -> JobOut:
     item.source_kind_label = source_kind_label(job.source)
     if score is not None:
         item.score = score
+
+    # Canonicalize untrusted source HTML at read time (repairs legacy rows
+    # before/without a backfill; upsert also normalizes on write).
+    if full_description:
+        html_out, text_out = normalize_job_description_fields(
+            job.description_html,
+            job.description_text,
+        )
+        item.description_html = html_out
+        item.description_text = text_out
     return item
 
 
@@ -114,7 +125,7 @@ async def jobs_search(
         # Configured freshness gate (defense in depth)
         if not is_fresh(job, settings.freshness_days):
             continue
-        item = _job_out(job, score)
+        item = _job_out(job, score, full_description=False)
         # Keep list payload lighter — full HTML only on job detail.
         item.description_html = None
         if item.description_text and len(item.description_text) > 500:

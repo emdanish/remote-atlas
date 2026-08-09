@@ -110,6 +110,16 @@ async def title_suggestions(
     return TitleSuggestionsResponse(query=query, suggestions=suggestions)
 
 
+def _skill_slug_aliases(slug: str) -> list[str]:
+    """All DB tags that map to an SEO skill slug (for count + search alignment)."""
+    tags = sorted({k for k, v in TAG_TO_SKILL_SLUG.items() if v == slug})
+    if not tags:
+        tags = [slug.replace("-", " "), slug.replace("-", ".")]
+    if slug not in tags:
+        tags.append(slug)
+    return tags
+
+
 @router.get("/seo/skills", response_model=SeoTaxonomyListResponse)
 async def seo_skills(
     request: Request,
@@ -119,49 +129,46 @@ async def seo_skills(
     """Indexable skill landings that pass inventory quality gate."""
     await enforce_rate_limit(request, "seo-skills", limit=60)
     settings = get_settings()
-    active, fresh = _fresh_clause()
-
-    # Unnest tags from skills + tech_tags
-    sql = text(
-        """
-        SELECT lower(trim(tag)) AS tag, count(*) AS cnt
-        FROM jobs j,
-        LATERAL unnest(
-          COALESCE(j.skills, ARRAY[]::varchar[]) || COALESCE(j.tech_tags, ARRAY[]::varchar[])
-        ) AS tag
-        WHERE j.is_active = true
-          AND (
-            j.posted_at >= :cutoff
-            OR (j.posted_at IS NULL AND j.first_seen_at >= :cutoff)
-          )
-          AND tag IS NOT NULL AND length(trim(tag)) > 1
-        GROUP BY 1
-        HAVING count(*) >= :min_jobs
-        ORDER BY cnt DESC
-        LIMIT 500
-        """
-    )
     cutoff = freshness_cutoff(settings.freshness_days)
+
+    # Distinct remote jobs per SEO slug — never sum overlapping tag counts.
     result = await db.execute(
-        sql, {"cutoff": cutoff, "min_jobs": MIN_SKILL_JOBS}
+        text(
+            """
+            SELECT j.id AS job_id, lower(trim(tag)) AS tag
+            FROM jobs j,
+            LATERAL unnest(
+              COALESCE(j.skills, ARRAY[]::varchar[])
+              || COALESCE(j.tech_tags, ARRAY[]::varchar[])
+            ) AS tag
+            WHERE j.is_active = true
+              AND lower(coalesce(j.workplace_type, '')) = 'remote'
+              AND (
+                j.posted_at >= :cutoff
+                OR (j.posted_at IS NULL AND j.first_seen_at >= :cutoff)
+              )
+              AND tag IS NOT NULL AND length(trim(tag)) > 1
+            """
+        ),
+        {"cutoff": cutoff},
     )
-    counts: dict[str, int] = {}
+    slug_jobs: dict[str, set[int]] = {}
     for row in result.mappings().all():
-        slug = TAG_TO_SKILL_SLUG.get(row["tag"])
-        if not slug or slug not in SEO_SKILL_MAP:
+        mapped = TAG_TO_SKILL_SLUG.get(row["tag"])
+        if not mapped or mapped not in SEO_SKILL_MAP:
             continue
-        counts[slug] = counts.get(slug, 0) + int(row["cnt"])
+        slug_jobs.setdefault(mapped, set()).add(int(row["job_id"]))
 
     items = [
         SeoTaxonomyItem(
             slug=slug,
             label=SEO_SKILL_MAP[slug],
-            count=cnt,
+            count=len(job_ids),
             kind="skill",
             href=skill_href(slug),
         )
-        for slug, cnt in sorted(counts.items(), key=lambda x: -x[1])
-        if cnt >= MIN_SKILL_JOBS
+        for slug, job_ids in sorted(slug_jobs.items(), key=lambda x: -len(x[1]))
+        if len(job_ids) >= MIN_SKILL_JOBS
     ][:limit]
     return SeoTaxonomyListResponse(freshness_days=settings.freshness_days, items=items)
 
@@ -177,15 +184,14 @@ async def seo_skill_meta(
         raise HTTPException(status_code=404, detail="Skill not available")
     settings = get_settings()
     cutoff = freshness_cutoff(settings.freshness_days)
-    tags = [k for k, v in TAG_TO_SKILL_SLUG.items() if v == slug]
-    if not tags:
-        tags = [slug.replace("-", " "), slug.replace("-", ".")]
+    tags = _skill_slug_aliases(slug)
     result = await db.execute(
         text(
             """
             SELECT count(*) AS cnt
             FROM jobs j
             WHERE j.is_active = true
+              AND lower(coalesce(j.workplace_type, '')) = 'remote'
               AND (
                 j.posted_at >= :cutoff
                 OR (j.posted_at IS NULL AND j.first_seen_at >= :cutoff)
@@ -212,6 +218,8 @@ async def seo_skill_meta(
         kind="skill",
         href=skill_href(slug),
     )
+
+
 
 
 @router.get("/seo/companies", response_model=SeoTaxonomyListResponse)

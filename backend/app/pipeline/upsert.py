@@ -11,6 +11,7 @@ from app.pipeline.enrich import is_pakistan_friendly_remote
 from sqlalchemy import func
 
 from app.pipeline.normalize import NormalizedJob, apply_url_is_usable
+from app.pipeline.description import normalize_job_description_fields
 from app.pipeline.source_trust import PREFERRED_SOURCES_ORDER
 
 UPSERT_CHUNK = 250
@@ -35,6 +36,12 @@ def _row(job: NormalizedJob, now: datetime) -> dict:
     career_page_url = job.career_page_url
     if career_page_url and len(career_page_url) > 1000:
         career_page_url = career_page_url[:1000]
+
+    desc_html, desc_text = normalize_job_description_fields(
+        job.description_html,
+        job.description_text,
+    )
+
     return {
         "company_id": job.company_id,
         "source": job.source,
@@ -44,12 +51,12 @@ def _row(job: NormalizedJob, now: datetime) -> dict:
         "company_url": company_url,
         "career_page_url": career_page_url,
         "apply_url": apply_url,
-        "description_text": job.description_text,
-        "description_html": job.description_html,
+        "description_text": desc_text,
+        "description_html": desc_html,
         "location_raw": location_raw,
         "workplace_type": (job.workplace_type or "unknown")[:32],
         "pakistan_friendly": is_pakistan_friendly_remote(
-            job.workplace_type or "unknown", location_raw, job.description_text
+            job.workplace_type or "unknown", location_raw, desc_text
         ),
         "employment_type": employment_type,
         "career_stage": (job.career_stage or "unknown")[:32],
