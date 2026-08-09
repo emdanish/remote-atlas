@@ -38,7 +38,7 @@ async def jobs_search(
     country: Optional[str] = Query(None, max_length=100),
     company: Optional[str] = Query(None, max_length=160),
     employment_type: Optional[str] = Query(None, max_length=80),
-    posted_within: Optional[int] = Query(None, ge=1, le=30),
+    posted_within: Optional[int] = Query(None, ge=1, le=60),
     pakistan_friendly: bool = Query(False, description="Remote roles likely open to PK"),
     skills: Optional[str] = Query(None, description="Comma-separated skills"),
     career_stage: Optional[str] = Query(

@@ -66,12 +66,13 @@ const sources = [
   { value: "workday", label: "Workday" },
 ];
 
-// Cap follows backend FRESHNESS_DAYS (14). Do not offer ranges the index never holds.
+// Cap aligns with backend FRESHNESS_DAYS (30).
 const dates = [
   { value: "1", label: "Last 24 hours" },
   { value: "3", label: "Last 3 days" },
   { value: "7", label: "Last 7 days" },
   { value: "14", label: "Last 14 days" },
+  { value: "30", label: "Last 30 days" },
 ];
 
 const employmentTypes = [

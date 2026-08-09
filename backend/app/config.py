@@ -39,8 +39,8 @@ class Settings(BaseSettings):
     database_pool_size: int = 5
     database_max_overflow: int = 5
 
-    # Product default: only roles published/first-seen within this window stay active.
-    freshness_days: int = 14
+    # Product default: active index window for posted/first-seen jobs (days).
+    freshness_days: int = 30
     ingest_concurrency: int = 24
     embedding_dimensions: int = 768
     embed_batch_size: int = 800

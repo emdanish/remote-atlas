@@ -76,6 +76,8 @@ class FitBriefResponse(BaseModel):
 
 
 def _profile_context(profile) -> dict[str, Any]:
+    from app.matching.skill_tags import profile_skill_universe
+
     skills: set[str] = set()
     level = "junior"
     remote_pref = "remote"
@@ -84,10 +86,7 @@ def _profile_context(profile) -> dict[str, Any]:
     location_preference: str | None = None
     prefer_pakistan = False
     if profile:
-        skills = {
-            *(s.lower() for s in (profile.skills or []) if s),
-            *(t.lower() for t in (profile.technologies or []) if t),
-        }
+        skills = profile_skill_universe(profile.skills, profile.technologies)
         level = profile.experience_level or "junior"
         remote_pref = profile.remote_preference or "remote"
         desired_roles = profile.desired_roles or []
@@ -136,17 +135,49 @@ async def recommendations(
         skills=skills,
     )
 
+    # Generous catalogue pull: do NOT hard-filter pakistan_friendly or skill tags in FTS.
+    # Workplace is soft unless user only wants onsite.
+    workplace = None
+    if ctx["remote_pref"] == "onsite":
+        workplace = "onsite"
+    elif ctx["remote_pref"] == "hybrid":
+        workplace = "hybrid"
+
+    candidate_jobs: list[tuple[Job, float]] = []
+    total = 0
+    queries = [
+        q,
+        build_search_query(desired_roles=None, skills=skills),
+        "software engineer OR developer OR backend OR frontend OR fullstack",
+        "",
+    ]
+    seen_q: set[str] = set()
     try:
-        scored, total = await hybrid_search(
-            db,
-            q=q,
-            workplace=None if ctx["remote_pref"] == "any" else ctx["remote_pref"],
-            pakistan_friendly=ctx["prefer_pakistan"] and ctx["remote_pref"] == "remote",
-            skills=None,
-            career_stage=None,
-            page=1,
-            page_size=min(100, max(page_size * 3, 40)),
-        )
+        for query in queries:
+            key = query.strip().lower()
+            if key in seen_q:
+                continue
+            seen_q.add(key)
+            scored, tot = await hybrid_search(
+                db,
+                q=query,
+                workplace=workplace,
+                pakistan_friendly=False,
+                skills=None,
+                career_stage=None,
+                sort="newest" if not query.strip() else "relevance",
+                page=1,
+                page_size=min(100, max(page_size * 5, 60)),
+            )
+            total = max(total, tot)
+            by_id = {j.id: (j, float(s or 0)) for j, s in candidate_jobs}
+            for job, hs in scored:
+                prev = by_id.get(job.id)
+                if not prev or float(hs or 0) > prev[1]:
+                    by_id[job.id] = (job, float(hs or 0))
+            candidate_jobs = list(by_id.values())
+            if len(candidate_jobs) >= 40:
+                break
     except Exception:  # noqa: BLE001
         return MatchResponse(
             total=0,
@@ -157,7 +188,7 @@ async def recommendations(
         )
 
     reranked: list[tuple[Job, Any]] = []
-    for job, hybrid_s in scored:
+    for job, hybrid_s in candidate_jobs:
         bd = score_job_breakdown(
             job,
             skills=skills,
@@ -170,7 +201,19 @@ async def recommendations(
             hybrid_score=float(hybrid_s or 0),
         )
         reranked.append((job, bd))
-    reranked.sort(key=lambda x: x[1].total, reverse=True)
+    # Keep even modest scores — prefer skill hits, but never empty if catalogue has roles
+    reranked.sort(key=lambda x: (x[1].total, x[1].skill), reverse=True)
+    if not reranked:
+        empty_reason = (
+            "No jobs in the fresh catalogue yet. Check back after ingestion, or browse Jobs."
+        )
+        return MatchResponse(
+            total=0,
+            freshness_days=settings.freshness_days,
+            results=[],
+            empty_reason=empty_reason,
+            profile_complete=bool(onboarding.get("onboarding_complete")),
+        )
 
     start = (max(1, page) - 1) * page_size
     page_rows = reranked[start : start + page_size]
@@ -184,7 +227,7 @@ async def recommendations(
         item.tech_tags = job.tech_tags or []
         item.source_kind = source_kind(job.source)
         item.source_kind_label = source_kind_label(job.source)
-        item.match_reasons = bd.reasons
+        item.match_reasons = bd.reasons or (["Catalogue role"] if bd.total < 15 else [])
         item.match_breakdown = bd.as_dict()
         if item.description_text and len(item.description_text) > 400:
             item.description_text = item.description_text[:400] + "…"
@@ -197,7 +240,7 @@ async def recommendations(
             "Try pulse alerts or broaden desired roles."
         )
     return MatchResponse(
-        total=total,
+        total=max(total, len(reranked)),
         freshness_days=settings.freshness_days,
         results=results,
         empty_reason=empty_reason,
@@ -345,36 +388,56 @@ async def parse_resume(
         pass
 
     skills = extract_skills(text)
-    technologies: list[str] = list(skills)
+    technologies: list[str] = []
     summary = ""
     experience_level = "junior"
     try:
         ai = await chat_completion(
             system=(
                 "Extract a concise JSON profile from a developer resume. "
-                'Return ONLY JSON: {"skills":[],"technologies":[],"experience_level":"internship|junior|mid|senior","summary":""}. '
-                "technologies = languages/frameworks/tools; skills can include softer or broader abilities."
+                "Return ONLY JSON with keys: "
+                '{"skills":[],"technologies":[],"experience_level":"internship|junior|mid|senior","summary":""}. '
+                "STRICT separation: "
+                "technologies = concrete languages, frameworks, libraries, databases, cloud, tools "
+                "(e.g. python, react, postgresql, docker, fastapi). "
+                "skills = professional capabilities and methods "
+                "(e.g. full-stack development, system design, agile collaboration, prompt engineering, devops practices). "
+                "Do NOT put the same strings in both arrays. Prefer short lowercase labels."
             ),
             user=text[:8000],
             temperature=0.1,
-            max_tokens=600,
+            max_tokens=700,
         )
         import json
 
         m = re.search(r"\{.*\}", ai, re.S)
         if m:
             payload = json.loads(m.group(0))
-            ai_skills = {str(s).lower().strip() for s in payload.get("skills", []) if s}
-            ai_techs = {str(t).lower().strip() for t in payload.get("technologies", []) if t}
-            skills = sorted(set(skills) | ai_skills | ai_techs)
-            technologies = sorted(ai_techs | set(technologies) | ai_skills)
+            ai_skills = [str(s).lower().strip() for s in payload.get("skills", []) if s]
+            ai_techs = [str(t).lower().strip() for t in payload.get("technologies", []) if t]
+            from app.matching.skill_tags import partition_skills_and_technologies
+
+            skills, technologies = partition_skills_and_technologies(
+                skills, ai_skills, ai_techs
+            )
             experience_level = payload.get("experience_level") or experience_level
             summary = payload.get("summary") or ""
     except (AIProviderError, Exception):
         summary = "Parsed with skill lexicon only (AI unavailable)."
-        technologies = list(skills)
+        from app.matching.skill_tags import partition_skills_and_technologies
 
-    seed_skills = [s for s in (technologies or skills) if s][:2]
+        skills, technologies = partition_skills_and_technologies(skills)
+
+    if not technologies and skills:
+        from app.matching.skill_tags import partition_skills_and_technologies
+
+        skills, technologies = partition_skills_and_technologies(skills)
+    if not skills and not technologies:
+        from app.matching.skill_tags import partition_skills_and_technologies
+
+        skills, technologies = partition_skills_and_technologies(extract_skills(text))
+
+    seed_skills = [s for s in (technologies or skills) if s][:4]
 
     result = await db.execute(
         select(User).options(selectinload(User.profile)).where(User.id == user.id)

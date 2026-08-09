@@ -23,7 +23,7 @@ import { formatTechLabel } from "@/lib/techCatalog";
 import { titleCase } from "@/lib/utils";
 import { Alert } from "@/components/ui/Alert";
 
-/** Product defaults only: Remote + last 14 days. Nothing else pre-filled. */
+/** Product defaults: Remote + last 14 days. Search allows up to 30 (index window). */
 const DEFAULT_FILTERS = {
   q: "",
   workplace: "remote",

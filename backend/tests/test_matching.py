@@ -8,6 +8,7 @@ from app.matching.scoring import (
     profile_onboarding_state,
     score_job_breakdown,
 )
+from app.matching.skill_tags import partition_skills_and_technologies
 
 
 def _job(**kwargs):
@@ -22,7 +23,7 @@ def _job(**kwargs):
         pakistan_friendly=True,
         posted_at=datetime.now(timezone.utc),
         first_seen_at=datetime.now(timezone.utc),
-        description_text="Build UI",
+        description_text="Build UI with React and TypeScript on a remote team",
     )
     defaults.update(kwargs)
     return SimpleNamespace(**defaults)
@@ -48,11 +49,40 @@ def test_score_prefers_skill_overlap():
     assert strong.pakistan >= 8
 
 
+def test_score_matches_skill_in_description_not_only_tags():
+    job = _job(
+        skills=[],
+        tech_tags=[],
+        description_text="Looking for FastAPI and PostgreSQL experience",
+    )
+    bd = score_job_breakdown(
+        job,
+        skills={"fastapi", "postgresql", "python"},
+        level="junior",
+        remote_pref="remote",
+    )
+    assert bd.skill > 0
+    assert bd.matched_skills
+
+
 def test_build_search_query_roles_first():
     q = build_search_query(desired_roles=["Flutter developer"], skills={"python"})
     assert q == "Flutter developer"
-    q2 = build_search_query(desired_roles=[], skills={"python", "django"})
-    assert "python" in q2 or "django" in q2
+    q2 = build_search_query(desired_roles=[], skills={"python", "django", "react"})
+    assert " OR " in q2 or "python" in q2
+
+
+def test_partition_skills_and_technologies_not_identical():
+    skills, tech = partition_skills_and_technologies(
+        ["python", "react", "fastapi", "postgresql", "docker"],
+        ["agile collaboration", "full-stack development", "prompt engineering"],
+        ["python", "react"],
+    )
+    assert "python" in tech
+    assert "react" in tech
+    assert "python" not in skills
+    assert "agile collaboration" in skills or "full-stack development" in skills
+    assert set(skills) != set(tech)
 
 
 def test_onboarding_seed_and_complete():

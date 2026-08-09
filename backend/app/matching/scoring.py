@@ -63,27 +63,32 @@ def score_job_breakdown(
     Multi-factor score in 0–100 space.
     hybrid_score is additive prior from FTS/vector (scaled modestly).
     """
-    profile_skills = _normalize_profile_skills(skills)
-    job_skills = _job_skill_set(job)
+    from app.matching.skill_tags import (
+        generous_skill_overlap,
+        normalize_tag,
+        profile_skill_universe,
+    )
+
+    profile_skills = profile_skill_universe(skills, None)
+    # also accept already-normalized sets
+    if skills and not profile_skills:
+        profile_skills = {normalize_tag(str(s)) for s in skills if s}
+
     title = (job.title or "").lower()
     location = (job.location_raw or "").lower()
     now = now or datetime.now(timezone.utc)
 
-    # Skills (0–35)
-    overlap = sorted(profile_skills & job_skills)
-    skill_raw = min(35.0, len(overlap) * 5.0)
-    for s in list(profile_skills)[:12]:
+    # Skills (0–40) — generous tag + description hits
+    overlap, missing = generous_skill_overlap(profile_skills, job)
+    skill_raw = min(40.0, len(overlap) * 6.0)
+    for s in list(profile_skills)[:16]:
         if s and s in title:
-            skill_raw = min(35.0, skill_raw + 2.0)
-    # bonus if many skills match relative to job tags
-    if job_skills and profile_skills:
-        coverage = len(overlap) / max(1, min(len(job_skills), 8))
-        skill_raw = min(35.0, skill_raw + coverage * 8.0)
+            skill_raw = min(40.0, skill_raw + 2.5)
+    if overlap:
+        skill_raw = min(40.0, skill_raw + min(10.0, len(overlap) * 1.5))
     skill_score = round(skill_raw, 2)
 
-    missing = sorted(job_skills - profile_skills)[:6]
-
-    # Role intent (0–20)
+    # Role intent (0–20) — soft: engineer/developer tokens help
     role_score = 0.0
     for role in desired_roles or []:
         normalized_role = (role or "").strip().lower()
@@ -96,16 +101,19 @@ def score_job_breakdown(
                 t for t in re.findall(r"[a-z0-9+#.]+", normalized_role) if len(t) > 2
             }
             title_terms = set(re.findall(r"[a-z0-9+#.]+", title))
-            role_score = max(role_score, min(20.0, len(role_terms & title_terms) * 4.0))
+            role_score = max(role_score, min(20.0, len(role_terms & title_terms) * 5.0))
+    if role_score < 6 and any(w in title for w in ("engineer", "developer", "software", "full stack", "fullstack")):
+        if profile_skills:
+            role_score = max(role_score, 8.0)
 
-    # Seniority (0–12)
+    # Seniority (0–12) — unknown stage no longer heavily penalizes
     seniority_score = 0.0
     level_n = (level or "").lower()
     stage = (job.career_stage or "unknown").lower()
     if level_n and stage == level_n:
         seniority_score = 12.0
     elif stage == "unknown" or not level_n:
-        seniority_score = 4.0
+        seniority_score = 8.0
     elif {
         "internship": 0,
         "junior": 1,
@@ -132,20 +140,25 @@ def score_job_breakdown(
             "senior": 3,
         }.get(level_n, 1)
     ) == 1:
-        seniority_score = 6.0
+        seniority_score = 9.0
+    else:
+        seniority_score = 4.0
 
-    # Remote / workplace (0–12)
+    # Remote / workplace (0–12) — remote-preferring candidates fit hybrid lightly
     remote_score = 0.0
     pref = (remote_pref or "remote").lower()
     wt = (job.workplace_type or "").lower()
     if pref == "any":
-        remote_score = 8.0
+        remote_score = 10.0
     elif pref == wt:
         remote_score = 12.0
-    elif pref == "remote" and wt == "hybrid":
-        remote_score = 5.0
+    elif pref == "remote" and wt in {"hybrid", "remote"}:
+        remote_score = 10.0 if wt == "remote" else 7.0
+    elif pref == "remote" and wt in {"", "unknown"}:
+        remote_score = 6.0
+    elif pref != "onsite":
+        remote_score = 4.0
 
-    # Location / cities (folded into remote bucket lightly via bonus)
     if any(c.strip().lower() in location for c in (cities or []) if c and c.strip()):
         remote_score = min(12.0, remote_score + 2.0)
     preference = (location_preference or "").strip().lower()
@@ -160,13 +173,17 @@ def score_job_breakdown(
         if wt == "remote" and pref_terms & {"worldwide", "anywhere", "global"}:
             remote_score = min(12.0, remote_score + 1.5)
 
-    # Pakistan affinity (0–10) — Remote Atlas differentiator
+    # Pakistan affinity (0–10) — soft by default for remote prefs
     pakistan_score = 0.0
     if pakistan_friendly:
         if job.pakistan_friendly:
             pakistan_score = 10.0
         elif wt == "remote":
-            pakistan_score = 3.0  # remote-only soft hope
+            pakistan_score = 5.0
+        else:
+            pakistan_score = 2.0
+    elif wt == "remote":
+        pakistan_score = 3.0
 
     # Freshness (0–10)
     freshness_score = 3.0
@@ -175,11 +192,9 @@ def score_job_breakdown(
         if posted.tzinfo is None:
             posted = posted.replace(tzinfo=timezone.utc)
         age_days = max(0.0, (now - posted).total_seconds() / 86400.0)
-        # ~10 at day 0, ~3 at day 14+
-        freshness_score = round(max(1.0, 10.0 * (2.718281828 ** (-age_days / 7.0))), 2)
+        freshness_score = round(max(1.0, 10.0 * (2.718281828 ** (-age_days / 10.0))), 2)
 
-    # Hybrid prior (0–8)
-    hybrid_boost = min(8.0, max(0.0, float(hybrid_score or 0.0)) * 0.15)
+    hybrid_boost = min(10.0, max(0.0, float(hybrid_score or 0.0)) * 0.2)
 
     total = (
         skill_score
@@ -194,7 +209,7 @@ def score_job_breakdown(
 
     reasons: list[str] = []
     if overlap:
-        reasons.append("Matched: " + ", ".join(overlap[:4]))
+        reasons.append("Matched: " + ", ".join(overlap[:5]))
     if role_score >= 12:
         reasons.append("Role title fit")
     if seniority_score >= 10:
@@ -203,7 +218,7 @@ def score_job_breakdown(
         reasons.append("Remote")
     if pakistan_score >= 8:
         reasons.append("Pakistan-friendly remote")
-    if freshness_score >= 8:
+    if freshness_score >= 7:
         reasons.append("Fresh posting")
 
     return MatchBreakdown(
@@ -229,14 +244,36 @@ def build_search_query(
     *,
     desired_roles: list[str] | None,
     skills: set[str],
-    fallback: str = "software engineer remote",
+    fallback: str = "software engineer OR developer OR fullstack OR backend OR frontend",
 ) -> str:
+    """Broad websearch-friendly query — prefer roles, else a few high-signal techs."""
     if desired_roles:
         first = (desired_roles[0] or "").strip()
         if first:
             return first
-    if skills:
-        return " ".join(list(skills)[:5])
+    # Prefer stack terms that appear in job titles often
+    priority = (
+        "python",
+        "typescript",
+        "javascript",
+        "react",
+        "next.js",
+        "node.js",
+        "fastapi",
+        "django",
+        "java",
+        "go",
+        "aws",
+        "postgresql",
+    )
+    lower_skills = {s.strip().lower() for s in skills if s}
+    ranked = [p for p in priority if p in lower_skills]
+    if not ranked:
+        ranked = sorted(lower_skills, key=len)[:5]
+    # websearch OR for generous FTS (avoid AND of 5 rare tokens)
+    terms = ranked[:4]
+    if terms:
+        return " OR ".join(terms)
     return fallback
 
 

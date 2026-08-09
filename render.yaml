@@ -29,7 +29,7 @@ services:
       - key: DATABASE_MAX_OVERFLOW
         value: "2"
       - key: FRESHNESS_DAYS
-        value: "14"
+        value: "30"
       # Never load BGE/ONNX on the free web dyno (cron embeds jobs offline).
       - key: EMBED_PROVIDER
         value: none
@@ -60,7 +60,7 @@ services:
       - key: DATABASE_URL_SYNC
         sync: false
       - key: FRESHNESS_DAYS
-        value: "14"
+        value: "30"
       - key: INGEST_CONCURRENCY
         value: "8"
       - key: EMBED_PROVIDER
