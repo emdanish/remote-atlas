@@ -23,6 +23,20 @@ from app.security import enforce_rate_limit
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+def _cookie_samesite() -> str:
+    """Starlette expects lowercase lax|strict|none."""
+    raw = (get_settings().auth_cookie_samesite or "lax").strip().lower()
+    return raw if raw in {"lax", "strict", "none"} else "lax"
+
+
+def _cookie_secure() -> bool:
+    settings = get_settings()
+    # SameSite=None requires Secure; forced so browsers accept the cookie.
+    if _cookie_samesite() == "none":
+        return True
+    return bool(settings.auth_cookie_secure)
+
+
 def _set_session_cookie(response: Response, token: str) -> None:
     settings = get_settings()
     response.set_cookie(
@@ -30,8 +44,8 @@ def _set_session_cookie(response: Response, token: str) -> None:
         value=token,
         max_age=settings.jwt_expire_minutes * 60,
         httponly=True,
-        secure=settings.auth_cookie_secure,
-        samesite=settings.auth_cookie_samesite,
+        secure=_cookie_secure(),
+        samesite=_cookie_samesite(),  # type: ignore[arg-type]
         path="/",
     )
 
@@ -96,8 +110,8 @@ async def logout(response: Response) -> None:
     response.delete_cookie(
         settings.auth_cookie_name,
         path="/",
-        secure=settings.auth_cookie_secure,
-        samesite=settings.auth_cookie_samesite,
+        secure=_cookie_secure(),
+        samesite=_cookie_samesite(),  # type: ignore[arg-type]
     )
 
 

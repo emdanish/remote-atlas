@@ -1,5 +1,10 @@
+import { clearAccessToken, getAccessToken } from "@/lib/session";
+
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(
+  /\/+$/,
+  "",
+);
 
 export class ApiError extends Error {
   status: number;
@@ -66,7 +71,8 @@ function humanizeDetail(body: unknown): { message: string; fields?: string[] } {
 
 export function authHeaders(token?: string | null): HeadersInit {
   const headers: HeadersInit = { "Content-Type": "application/json" };
-  if (token) headers.Authorization = `Bearer ${token}`;
+  const resolved = token === undefined ? getAccessToken() : token;
+  if (resolved) headers.Authorization = `Bearer ${resolved}`;
   return headers;
 }
 
@@ -83,6 +89,7 @@ export async function handle<T>(res: Response): Promise<T> {
       /* ignore */
     }
     if (res.status === 401) {
+      clearAccessToken();
       message = message || "Please sign in again.";
     } else if (res.status === 429) {
       message = "Too many requests. Wait a moment and try again.";
