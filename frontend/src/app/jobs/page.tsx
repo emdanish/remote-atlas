@@ -22,6 +22,7 @@ import { useAuth } from "@/lib/auth";
 import { formatTechLabel } from "@/lib/techCatalog";
 import { titleCase } from "@/lib/utils";
 import { Alert } from "@/components/ui/Alert";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 /** Product defaults: Remote + last 14 days. Search allows up to 30 (index window). */
 const DEFAULT_FILTERS = {
@@ -353,9 +354,9 @@ function JobsSearchInner() {
         <h1 className="font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
           Jobs
         </h1>
-        <p className="mt-2 max-w-2xl text-sm text-muted sm:text-base">
-          Verified roles with official apply links. Default view is remote jobs from the last 14
-          days — add filters only when you want them.
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted sm:text-base">
+          Fresh roles with official apply links. Defaults: remote, last 14 days. Narrow only when
+          you need to.
         </p>
       </div>
 
@@ -489,13 +490,13 @@ function JobsSearchInner() {
           </div>
 
           {error ? (
-            <Alert tone="error" title="Search unavailable" className="mb-4">
-              {formatApiError(error, "Search failed. Is the API running on port 8000?")}
+            <Alert tone="error" title="We couldn't load these jobs" className="mb-4">
+              {formatApiError(error, "Try again in a moment. If this continues, check the API status.")}
             </Alert>
           ) : null}
 
           {isLoading && !data ? (
-            <div className="space-y-4">
+            <div className="space-y-3" aria-busy="true" aria-label="Loading jobs">
               {Array.from({ length: 5 }).map((_, i) => (
                 <JobCardSkeleton key={i} />
               ))}
@@ -503,16 +504,13 @@ function JobsSearchInner() {
           ) : null}
 
           {!isLoading && data && data.results.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-line bg-elevated p-8 text-center sm:p-10">
-              <h2 className="font-display text-xl font-semibold text-ink">No matching roles</h2>
-              <p className="mx-auto mt-2 max-w-md text-sm text-muted">
-                Nothing in the catalogue fits {resultsSummary.toLowerCase()}. Try removing a
-                technology chip, clearing city/country, or widening the date window.
-              </p>
-              <Button className="mt-5" variant="secondary" onClick={clear}>
-                Reset filters
-              </Button>
-            </div>
+            <EmptyState
+              title="Nothing matched those filters"
+              description="Try removing a technology chip, clearing city/country, or opening the date window to 30 days."
+              actions={[
+                { label: "Reset to remote · 14 days", onClick: clear, variant: "secondary" },
+              ]}
+            />
           ) : null}
 
           <div

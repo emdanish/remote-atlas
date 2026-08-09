@@ -9,6 +9,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { SectionLabel } from "@/components/ui/SectionLabel";
+import { HeroHeadline } from "@/components/marketing/HeroHeadline";
 import { Reveal } from "@/components/marketing/Reveal";
 import { StatCounter } from "@/components/marketing/StatCounter";
 import { getIngestStats, getSeoLocations, getSeoSkills } from "@/lib/api";
@@ -112,53 +114,63 @@ export default async function LandingPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: safeJsonLd(faqJsonLd) }}
       />
-      {/* Hero — brand first, one composition */}
+      {/* Hero — brand first, search-led product composition */}
       <section className="relative overflow-hidden border-b border-line bg-ink text-white">
-        <div className="absolute inset-0 atlas-dark-grid opacity-60" aria-hidden />
+        <div className="absolute inset-0 atlas-dark-grid opacity-50" aria-hidden />
         <div
-          className="absolute -right-24 top-0 h-[520px] w-[520px] rounded-full bg-accent/20 blur-3xl"
+          className="absolute -right-32 top-[-10%] h-[480px] w-[480px] rounded-full bg-accent/18 blur-3xl"
           aria-hidden
         />
-        <div className="absolute -left-20 bottom-0 h-72 w-72 rounded-full bg-white/5 blur-3xl" aria-hidden />
+        <div
+          className="absolute -left-24 bottom-[-20%] h-80 w-80 rounded-full bg-white/[0.04] blur-3xl"
+          aria-hidden
+        />
 
-        <div className="relative mx-auto max-w-6xl px-4 pb-16 pt-16 sm:px-6 sm:pb-20 sm:pt-20 lg:pb-24 lg:pt-24">
+        <div className="relative mx-auto max-w-6xl px-4 pb-14 pt-14 sm:px-6 sm:pb-16 sm:pt-16 lg:pb-20 lg:pt-20">
           <p className="font-display text-sm font-semibold tracking-[0.28em] text-teal-300/90 sm:text-base">
             REMOTE ATLAS
           </p>
-          <h1 className="mt-5 max-w-3xl font-display text-4xl font-semibold leading-[1.05] tracking-[-0.03em] text-balance sm:text-5xl lg:text-6xl">
-            A job search engine built for candidates.
-          </h1>
+          <div className="mt-5">
+            <HeroHeadline text="Fresh remote tech jobs from real career pages." />
+          </div>
           <p className="mt-6 max-w-xl text-base leading-7 text-white/70 sm:text-lg sm:leading-8">
-            Fresh roles from company career systems and trusted sources. Search what
-            you actually want. Apply on the employer&apos;s official page. Optionally
-            tailor your resume to the role.
+            Index roles from company ATS systems and trusted public feeds. Search by role or
+            stack. Apply on the employer&apos;s site — not through a recruiter marketplace.
           </p>
 
-          <form action="/jobs" className="mt-10 max-w-2xl">
+          <form action="/jobs" className="mt-9 max-w-2xl" role="search">
             <label htmlFor="hero-q" className="sr-only">
               Search jobs
             </label>
-            <div className="flex flex-col gap-2 rounded-xl border border-white/15 bg-white/5 p-2 backdrop-blur-sm sm:flex-row sm:items-center">
+            <div className="hero-search flex flex-col gap-2 rounded-xl border border-white/15 bg-white/[0.07] p-2 shadow-[0_0_0_1px_rgb(255_255_255/0.04)_inset] transition-[border-color,box-shadow] focus-within:border-teal-300/50 focus-within:shadow-[0_0_0_3px_rgb(94_234_212/0.15)] sm:flex-row sm:items-center">
               <div className="flex min-w-0 flex-1 items-center gap-3 px-3">
                 <Search className="h-5 w-5 shrink-0 text-teal-300" aria-hidden />
                 <input
                   id="hero-q"
                   name="q"
                   placeholder="Role, stack, or company — e.g. TypeScript remote"
-                  className="h-11 min-w-0 flex-1 border-0 bg-transparent text-white outline-none placeholder:text-white/40"
+                  className="h-11 min-w-0 flex-1 border-0 bg-transparent text-[15px] text-white outline-none placeholder:text-white/40"
+                  autoComplete="off"
                 />
               </div>
-              <Button type="submit" size="lg" className="shrink-0 bg-teal-300 text-ink hover:bg-teal-200">
-                Search the index
+              <Button
+                type="submit"
+                size="lg"
+                className="shrink-0 bg-teal-300 text-ink hover:bg-teal-200"
+              >
+                Search jobs
                 <ArrowRight className="h-4 w-4" aria-hidden />
               </Button>
             </div>
           </form>
 
-          <p className="mt-5 text-sm text-white/50">
-            No account required to search. Listings older than{" "}
-            {stats?.freshness ?? 14} days leave the active index automatically.
-          </p>
+          <ul className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm text-white/50">
+            <li>No account to search</li>
+            <li>Official apply links only</li>
+            <li>
+              {stats?.freshness ?? 14}-day freshness window
+            </li>
+          </ul>
         </div>
       </section>
 
@@ -167,7 +179,7 @@ export default async function LandingPage() {
         <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-14">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-xs font-bold tracking-[0.18em] text-accent">LIVE INDEX</p>
+              <SectionLabel>LIVE INDEX</SectionLabel>
               <h2 id="live-index-heading" className="mt-2 font-display text-2xl font-semibold text-ink sm:text-3xl">
                 What&apos;s currently searchable
               </h2>
@@ -196,7 +208,7 @@ export default async function LandingPage() {
       {(explore.skills.length > 0 || explore.locations.length > 0) && (
         <section className="border-b border-line bg-paper" aria-labelledby="explore-heading">
           <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-14">
-            <p className="text-xs font-bold tracking-[0.18em] text-accent">EXPLORE</p>
+            <SectionLabel>EXPLORE</SectionLabel>
             <h2 id="explore-heading" className="mt-2 font-display text-2xl font-semibold text-ink">
               Popular remote paths
             </h2>
@@ -253,7 +265,7 @@ export default async function LandingPage() {
       <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-24">
         <Reveal>
           <div className="max-w-2xl">
-            <p className="text-xs font-bold tracking-[0.18em] text-accent">WHY IT EXISTS</p>
+            <SectionLabel>WHY IT EXISTS</SectionLabel>
             <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
               Not a recruiter marketplace. Not a feed of paid promotions.
             </h2>
@@ -298,7 +310,7 @@ export default async function LandingPage() {
       <section className="border-y border-line bg-elevated">
         <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-24">
           <Reveal>
-            <p className="text-xs font-bold tracking-[0.18em] text-accent">HOW IT WORKS</p>
+            <SectionLabel>HOW IT WORKS</SectionLabel>
             <h2 className="mt-3 max-w-xl font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
               From discovery to the application page.
             </h2>
@@ -342,7 +354,7 @@ export default async function LandingPage() {
       <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-24">
         <div className="grid items-center gap-12 lg:grid-cols-2">
           <Reveal>
-            <p className="text-xs font-bold tracking-[0.18em] text-accent">RESUME TAILORING</p>
+            <SectionLabel>RESUME TAILORING</SectionLabel>
             <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
               Align your resume to one opportunity — without fabricating a new one.
             </h2>
@@ -408,7 +420,7 @@ export default async function LandingPage() {
       <section className="border-t border-line bg-elevated">
         <div className="mx-auto grid max-w-6xl gap-12 px-4 py-20 sm:px-6 sm:py-24 lg:grid-cols-[0.8fr_1.2fr]">
           <div>
-            <p className="text-xs font-bold tracking-[0.18em] text-accent">FAQ</p>
+            <SectionLabel>FAQ</SectionLabel>
             <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-ink">
               Short answers.
             </h2>
@@ -439,10 +451,11 @@ export default async function LandingPage() {
         <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-8 px-4 py-14 sm:px-6 md:flex-row md:items-center">
           <div>
             <p className="font-display text-2xl font-semibold sm:text-3xl">
-              Start with the live index.
+              Start with what&apos;s in the index today.
             </p>
             <p className="mt-2 max-w-lg text-sm leading-6 text-white/65">
-              Search freely. When a role matters, apply on the official page — and tailor your resume if you need the edge.
+              Search freely. When a role matters, apply on the official page — and tailor your
+              resume if you want a sharper submission.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">

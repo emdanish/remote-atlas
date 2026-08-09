@@ -107,7 +107,7 @@ export default async function JobDetailPage({ params }: Props) {
   const tags = uniqueLabels(job.tech_tags, job.skills).slice(0, 16);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
       {postingLd ? (
         <script
           type="application/ld+json"
@@ -128,7 +128,7 @@ export default async function JobDetailPage({ params }: Props) {
           Jobs
         </Link>
         <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-        <span className="text-ink line-clamp-1">{job.title}</span>
+        <span className="line-clamp-1 font-medium text-ink">{job.title}</span>
       </nav>
 
       {!indexable ? (
@@ -137,78 +137,82 @@ export default async function JobDetailPage({ params }: Props) {
           role="status"
         >
           This listing is no longer in the active Remote Atlas index (
-          {job.is_active === false ? "closed or removed from source" : "outside the freshness window"}
+          {job.is_active === false
+            ? "closed or removed from source"
+            : "outside the freshness window"}
           ). It is kept for reference and is not offered as a current opportunity.
         </div>
       ) : null}
 
-      <div className="grid gap-10 lg:grid-cols-[1fr_280px]">
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px]">
         <article itemScope itemType="https://schema.org/JobPosting">
-          <div className="flex flex-wrap gap-2">
-            <Badge tone="accent">{job.source}</Badge>
-            {job.source_kind || job.source_kind_label ? (
-              <Badge>{sourceKindLabel(job.source_kind, job.source_kind_label || undefined)}</Badge>
-            ) : null}
-            <Badge>{titleCase(job.workplace_type)}</Badge>
-            {job.career_stage !== "unknown" ? (
-              <Badge>{titleCase(job.career_stage)}</Badge>
-            ) : null}
-            {job.employment_type ? <Badge>{job.employment_type}</Badge> : null}
-          </div>
-          <h1
-            className="mt-4 font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl"
-            itemProp="title"
-          >
-            {job.title}
-          </h1>
-          <p className="mt-2 text-lg font-medium text-ink/80" itemProp="hiringOrganization">
-            <Link
-              href={companySeoHref(job.company_name)}
-              className="hover:text-accent hover:underline"
+          <div className="border-b border-line pb-8">
+            <div className="flex flex-wrap gap-2">
+              <Badge tone="accent">{job.source}</Badge>
+              {job.source_kind || job.source_kind_label ? (
+                <Badge>
+                  {sourceKindLabel(job.source_kind, job.source_kind_label || undefined)}
+                </Badge>
+              ) : null}
+              <Badge>{titleCase(job.workplace_type)}</Badge>
+              {job.career_stage !== "unknown" ? (
+                <Badge>{titleCase(job.career_stage)}</Badge>
+              ) : null}
+              {job.employment_type ? <Badge>{job.employment_type}</Badge> : null}
+            </div>
+            <h1
+              className="mt-4 font-display text-3xl font-semibold tracking-tight text-ink sm:text-[2.35rem] sm:leading-[1.15]"
+              itemProp="title"
             >
-              {job.company_name}
-            </Link>
-          </p>
-          <div className="mt-3 flex flex-wrap gap-4 text-sm text-muted">
-            {job.location_raw ? (
-              <span className="inline-flex items-center gap-1.5">
-                <MapPin className="h-4 w-4" aria-hidden />
-                <span itemProp="jobLocation">{job.location_raw}</span>
+              {job.title}
+            </h1>
+            <p className="mt-2 text-lg font-semibold text-ink/85" itemProp="hiringOrganization">
+              <Link
+                href={companySeoHref(job.company_name)}
+                className="hover:text-accent hover:underline"
+              >
+                {job.company_name}
+              </Link>
+            </p>
+            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted">
+              {job.location_raw ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="h-4 w-4 shrink-0" aria-hidden />
+                  <span itemProp="jobLocation">{job.location_raw}</span>
+                </span>
+              ) : null}
+              <span className="tabular-nums">
+                Posted {formatRelativeDate(job.posted_at || job.first_seen_at)}
               </span>
-            ) : null}
-            <span>
-              Posted {formatRelativeDate(job.posted_at || job.first_seen_at)}
-            </span>
-          </div>
+            </div>
 
-          {tags.length ? (
-            <ul className="mt-6 flex flex-wrap gap-2" aria-label="Skills and technologies">
-              {tags.map((t) => {
-                const seoHref = skillSeoHref(t);
-                const href = seoHref || `/jobs?skills=${encodeURIComponent(t)}`;
-                return (
-                  <li
-                    key={t.toLowerCase()}
-                    className="rounded-md border border-line bg-paper px-2.5 py-1 text-xs font-medium text-muted"
-                  >
-                    <Link href={href} className="hover:text-accent">
-                      {t}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : null}
+            {tags.length ? (
+              <ul className="mt-6 flex flex-wrap gap-2" aria-label="Skills and technologies">
+                {tags.map((t) => {
+                  const seoHref = skillSeoHref(t);
+                  const href = seoHref || `/jobs?skills=${encodeURIComponent(t)}`;
+                  return (
+                    <li key={t.toLowerCase()}>
+                      <Link
+                        href={href}
+                        className="inline-flex rounded-md border border-line bg-paper px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent"
+                      >
+                        {t}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
+          </div>
 
           <div className="mt-10" itemProp="description">
+            <h2 className="sr-only">Job description</h2>
             <JobDescription html={job.description_html} text={job.description_text} />
           </div>
 
-          <div className="mt-10">
+          <div className="mt-12 space-y-8 border-t border-line pt-10">
             <TailorResumePanel jobId={job.id} />
-          </div>
-
-          <div className="mt-10">
             <FitBriefPanel jobId={job.id} />
           </div>
         </article>
@@ -218,8 +222,8 @@ export default async function JobDetailPage({ params }: Props) {
             <p className="text-xs font-semibold uppercase tracking-wider text-muted">
               Official application
             </p>
-            <p className="mt-2 text-sm text-muted">
-              Remote Atlas does not host applications. You apply on the company&apos;s system.
+            <p className="mt-2 text-sm leading-6 text-muted">
+              Apply on the company&apos;s own system. Remote Atlas does not host applications.
             </p>
             <div className="mt-4 flex flex-col gap-2">
               {applyUrl && indexable ? (
@@ -244,19 +248,19 @@ export default async function JobDetailPage({ params }: Props) {
             </div>
           </div>
           <div className="rounded-xl border border-line bg-paper p-5 text-sm">
-            <p className="font-medium text-ink">Source transparency</p>
-            <dl className="mt-3 space-y-2 text-muted">
-              <div className="flex justify-between gap-2">
+            <p className="font-semibold text-ink">Source transparency</p>
+            <dl className="mt-3 space-y-2.5 text-muted">
+              <div className="flex justify-between gap-3">
                 <dt>Source</dt>
                 <dd className="font-medium text-ink">{job.source}</dd>
               </div>
-              <div className="flex justify-between gap-2">
+              <div className="flex justify-between gap-3">
                 <dt>Provenance</dt>
-                <dd className="font-medium text-ink text-right">
+                <dd className="text-right font-medium text-ink">
                   {sourceKindLabel(job.source_kind, job.source_kind_label || undefined)}
                 </dd>
               </div>
-              <div className="flex justify-between gap-2">
+              <div className="flex justify-between gap-3">
                 <dt>Workplace</dt>
                 <dd className="font-medium text-ink">{titleCase(job.workplace_type)}</dd>
               </div>
@@ -271,11 +275,11 @@ export default async function JobDetailPage({ params }: Props) {
       </div>
 
       {related.length ? (
-        <section className="mt-16" aria-labelledby="related-roles-heading">
+        <section className="mt-16 border-t border-line pt-12" aria-labelledby="related-roles-heading">
           <h2 id="related-roles-heading" className="font-display text-2xl font-semibold text-ink">
             Related roles
           </h2>
-          <div className="mt-6 space-y-4">
+          <div className="mt-6 space-y-3">
             {related.map((j, i) => (
               <JobCard key={j.id} job={j} index={i} />
             ))}

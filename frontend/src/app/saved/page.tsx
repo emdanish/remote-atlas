@@ -7,6 +7,7 @@ import { ExternalLink, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Alert } from "@/components/ui/Alert";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { WorkspaceNav } from "@/components/workspace/WorkspaceNav";
 import {
   deleteSaved,
@@ -190,17 +191,21 @@ export default function SavedPage() {
       ) : null}
 
       {!savedQuery.isLoading && savedQuery.data?.length === 0 ? (
-        <div className="mt-8 rounded-xl border border-dashed border-line p-10 text-center">
-          <p className="font-medium text-ink">Nothing saved yet</p>
-          <p className="mt-1 text-sm text-muted">Save promising roles, then manage every application here.</p>
-          <Button href="/jobs" className="mt-4">Browse jobs</Button>
-        </div>
+        <EmptyState
+          className="mt-8"
+          title="Your saved jobs will appear here"
+          description="Save a role from search or a job page, then track Saved → Applied → Interview → Offer."
+          actions={[{ href: "/jobs", label: "Browse jobs" }]}
+        />
       ) : null}
 
       {!savedQuery.isLoading && savedQuery.data?.length && visibleItems.length === 0 ? (
-        <div className="mt-8 rounded-xl border border-dashed border-line p-8 text-center text-sm text-muted">
-          No jobs currently have this status.
-        </div>
+        <EmptyState
+          className="mt-8"
+          title="No jobs with this status"
+          description="Switch the filter above or move a saved role into this stage."
+          actions={[{ label: "Show all", onClick: () => setStatusFilter("all"), variant: "secondary" }]}
+        />
       ) : null}
 
       <ul className="mt-6 space-y-4">

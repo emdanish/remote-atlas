@@ -93,10 +93,10 @@ export default function OnboardingPage() {
         <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
           {step === "upload" ? "Add your resume" : "Roles matched to you"}
         </h1>
-        <p className="mt-2 max-w-xl text-sm text-muted sm:text-base">
+        <p className="mt-2 max-w-xl text-sm leading-6 text-muted sm:text-base">
           {step === "upload"
-            ? "AI extracts your stack with automatic lexicon fallback. Matches use your skills; Jobs stays unfiltered (remote · 14 days only) until you choose filters."
-            : "Curated from our verified catalogue. Each card shows why it fitted — apply only on official career pages."}
+            ? "We extract skills and tech from your resume to rank roles. You can skip and fill your profile later — Jobs stays open either way."
+            : "Ranked from the live catalogue. Apply only on official career pages."}
         </p>
       </div>
 

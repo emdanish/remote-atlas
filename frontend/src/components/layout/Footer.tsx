@@ -1,12 +1,22 @@
 import Link from "next/link";
 import { Logo } from "@/components/brand/Logo";
 
-const productLinks = [
+const exploreLinks = [
   { href: "/jobs", label: "Browse jobs" },
+  { href: "/companies", label: "Companies" },
   { href: "/remote-javascript-jobs", label: "JavaScript remote" },
   { href: "/remote-python-jobs", label: "Python remote" },
-  { href: "/companies", label: "Companies" },
-  { href: "/remote-jobs/pakistan", label: "Pakistan-friendly remote" },
+  { href: "/remote-jobs/pakistan", label: "Pakistan-friendly" },
+];
+
+const productLinks = [
+  { href: "/matches", label: "Matches" },
+  { href: "/saved", label: "Saved jobs" },
+  { href: "/alerts", label: "Pulse alerts" },
+  { href: "/profile", label: "Profile" },
+];
+
+const accountLinks = [
   { href: "/register", label: "Create account" },
   { href: "/login", label: "Sign in" },
 ];
@@ -14,21 +24,20 @@ const productLinks = [
 export function Footer() {
   return (
     <footer className="mt-auto border-t border-line bg-elevated">
-      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-12 sm:px-6 md:flex-row md:items-start md:justify-between">
+      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
         <div className="max-w-sm space-y-3">
           <Logo size="sm" />
           <p className="text-sm leading-relaxed text-muted">
-            A candidate-first job search engine: authentic sources, a strict freshness
-            window, and a path straight to the employer&apos;s apply page — plus optional
-            resume tailoring.
+            Candidate-first job search: authentic sources, a strict freshness window, and a direct
+            path to the employer&apos;s apply page.
           </p>
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted">Product</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted">Explore</p>
           <ul className="mt-3 space-y-2">
-            {productLinks.map((l) => (
+            {exploreLinks.map((l) => (
               <li key={l.href}>
-                <Link href={l.href} className="text-sm text-ink hover:text-accent">
+                <Link href={l.href} className="text-sm text-ink transition-colors hover:text-accent">
                   {l.label}
                 </Link>
               </li>
@@ -36,10 +45,32 @@ export function Footer() {
           </ul>
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted">Trust</p>
-          <ul className="mt-3 space-y-2 text-sm text-muted">
-            <li>Official apply URLs only</li>
-            <li>Strictly recent job listings</li>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted">Workspace</p>
+          <ul className="mt-3 space-y-2">
+            {productLinks.map((l) => (
+              <li key={l.href}>
+                <Link href={l.href} className="text-sm text-ink transition-colors hover:text-accent">
+                  {l.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted">Account</p>
+          <ul className="mt-3 space-y-2">
+            {accountLinks.map((l) => (
+              <li key={l.href}>
+                <Link href={l.href} className="text-sm text-ink transition-colors hover:text-accent">
+                  {l.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-6 text-xs font-semibold uppercase tracking-wider text-muted">Trust</p>
+          <ul className="mt-2 space-y-1.5 text-sm text-muted">
+            <li>Official apply URLs</li>
+            <li>Strict freshness window</li>
             <li>Transparent sources</li>
           </ul>
         </div>
@@ -48,7 +79,7 @@ export function Footer() {
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-4 py-4 text-xs text-muted sm:flex-row sm:px-6">
           <span>© {new Date().getFullYear()} Remote Atlas</span>
           <span>
-            Built with ❤️ by{" "}
+            Built with care by{" "}
             <a
               href="https://emdanish.dev"
               target="_blank"

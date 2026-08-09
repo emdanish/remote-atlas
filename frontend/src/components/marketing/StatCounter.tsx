@@ -39,11 +39,11 @@ export function StatCounter({
 
   return (
     <div ref={ref} className="text-center">
-      <p className="font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
+      <p className="font-display text-3xl font-semibold tracking-tight text-ink tabular-nums sm:text-4xl">
         {value === null ? "—" : n.toLocaleString()}
         {value === null ? "" : suffix}
       </p>
-      <p className="mt-1 text-sm text-muted">{label}</p>
+      <p className="mt-1.5 text-sm text-muted">{label}</p>
     </div>
   );
 }

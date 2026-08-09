@@ -6,6 +6,7 @@ import { useState } from "react";
 import { JobCard } from "@/components/jobs/JobCard";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { WorkspaceNav } from "@/components/workspace/WorkspaceNav";
 import {
   generateMatchNotifications,
@@ -217,23 +218,19 @@ export default function MatchesPage() {
           ))}
         </div>
         {recs.data && recs.data.results.length === 0 ? (
-          <div className="mt-4 rounded-xl border border-dashed border-line bg-elevated p-6 text-sm text-muted">
-            <p>{recs.data.empty_reason || "No matches yet."}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button href="/onboarding" size="sm">
-                Resume onboarding
-              </Button>
-              <Button href="/profile" size="sm" variant="secondary">
-                Edit profile
-              </Button>
-              <Button href="/jobs" size="sm" variant="ghost">
-                Browse jobs
-              </Button>
-              <Button href="/alerts" size="sm" variant="ghost">
-                Create pulse alert
-              </Button>
-            </div>
-          </div>
+          <EmptyState
+            className="mt-4"
+            title="No matches yet"
+            description={
+              recs.data.empty_reason ||
+              "Add skills or upload a resume so Atlas can rank roles against your profile."
+            }
+            actions={[
+              { href: "/onboarding", label: "Resume onboarding" },
+              { href: "/profile", label: "Edit profile", variant: "secondary" },
+              { href: "/jobs", label: "Browse jobs", variant: "ghost" },
+            ]}
+          />
         ) : null}
       </section>
     </div>

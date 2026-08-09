@@ -36,13 +36,22 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="mx-auto flex min-h-[70vh] max-w-md flex-col justify-center px-4 py-16">
+    <div className="relative mx-auto flex min-h-[70vh] max-w-md flex-col justify-center px-4 py-16">
+      <div
+        className="pointer-events-none absolute inset-x-0 top-8 -z-10 mx-auto h-40 max-w-sm rounded-full bg-accent/8 blur-3xl"
+        aria-hidden
+      />
       <Logo href="/" size="sm" className="mb-8 justify-center" />
-      <h1 className="text-center font-display text-3xl font-semibold text-ink">Create account</h1>
+      <h1 className="text-center font-display text-3xl font-semibold tracking-tight text-ink">
+        Create account
+      </h1>
       <p className="mt-2 text-center text-sm text-muted">
         Save jobs, track applications, and personalize recommendations.
       </p>
-      <form onSubmit={onSubmit} className="mt-8 space-y-4 rounded-xl border border-line bg-elevated p-6 shadow-soft">
+      <form
+        onSubmit={onSubmit}
+        className="mt-8 space-y-4 rounded-xl border border-line bg-elevated p-6 shadow-soft sm:p-7"
+      >
         <label className="block text-sm">
           <span className="mb-1.5 block font-medium">Full name</span>
           <Input

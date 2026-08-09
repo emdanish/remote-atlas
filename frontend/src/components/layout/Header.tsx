@@ -11,15 +11,21 @@ import { cn } from "@/lib/utils";
 
 const publicLinks = [
   { href: "/jobs", label: "Jobs" },
+  { href: "/companies", label: "Companies" },
 ];
 
 const authLinks = [
   { href: "/jobs", label: "Jobs" },
   { href: "/matches", label: "Matches" },
-  { href: "/alerts", label: "Pulse" },
   { href: "/saved", label: "Saved" },
-  { href: "/profile", label: "Profile" },
+  { href: "/alerts", label: "Pulse" },
+  { href: "/companies", label: "Companies" },
 ];
+
+function isActive(pathname: string, href: string) {
+  if (href === "/jobs") return pathname === "/jobs" || pathname.startsWith("/jobs/");
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function Header() {
   const { user, logout, loading } = useAuth();
@@ -37,19 +43,19 @@ export function Header() {
     : "";
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line/80 bg-elevated/90 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+    <header className="sticky top-0 z-40 border-b border-line/70 bg-elevated/85 backdrop-blur-md supports-[backdrop-filter]:bg-elevated/75">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:h-16 sm:px-6">
         <Logo size="sm" />
-        <nav className="hidden items-center gap-1 md:flex" aria-label="Primary">
+        <nav className="hidden items-center gap-0.5 md:flex" aria-label="Primary">
           {links.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               className={cn(
-                "rounded-md px-3 py-2 text-sm font-medium text-muted transition-colors hover:text-ink",
-                pathname === link.href || pathname.startsWith(`${link.href}/`)
+                "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                isActive(pathname, link.href)
                   ? "bg-paper text-ink"
-                  : "",
+                  : "text-muted hover:bg-paper/70 hover:text-ink",
               )}
             >
               {link.label}
@@ -69,19 +75,22 @@ export function Header() {
           ) : null}
           {!loading && user ? (
             <details className="group relative">
-              <summary className="flex cursor-pointer list-none items-center gap-2 rounded-full border border-line bg-elevated p-1 pr-2 shadow-soft transition hover:border-accent/30 hover:shadow-lift [&::-webkit-details-marker]:hidden">
-                <span className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-accent to-ink text-xs font-bold text-white">
+              <summary className="flex cursor-pointer list-none items-center gap-2 rounded-full border border-line bg-elevated p-1 pr-2.5 shadow-soft transition hover:border-accent/30 [&::-webkit-details-marker]:hidden">
+                <span className="grid h-8 w-8 place-items-center rounded-full bg-accent text-xs font-bold text-white">
                   {initials}
                 </span>
-                <span className="hidden max-w-32 truncate text-sm font-semibold text-ink lg:block">
+                <span className="hidden max-w-28 truncate text-sm font-semibold text-ink lg:block">
                   {displayName}
                 </span>
-                <ChevronDown className="h-4 w-4 text-muted transition group-open:rotate-180" aria-hidden />
+                <ChevronDown
+                  className="h-3.5 w-3.5 text-muted transition group-open:rotate-180"
+                  aria-hidden
+                />
               </summary>
-              <div className="absolute right-0 top-[calc(100%+0.65rem)] w-72 overflow-hidden rounded-xl border border-line bg-elevated shadow-lift">
-                <div className="border-b border-line bg-paper/70 p-4">
-                  <div className="flex items-center gap-3">
-                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-gradient-to-br from-accent to-ink text-sm font-bold text-white">
+              <div className="absolute right-0 top-[calc(100%+0.5rem)] w-64 overflow-hidden rounded-xl border border-line bg-elevated shadow-lift">
+                <div className="border-b border-line bg-paper/80 p-3.5">
+                  <div className="flex items-center gap-2.5">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent text-xs font-bold text-white">
                       {initials}
                     </span>
                     <div className="min-w-0">
@@ -92,13 +101,13 @@ export function Header() {
                     </div>
                   </div>
                 </div>
-                <div className="p-2">
+                <div className="p-1.5">
                   <Link
                     href="/profile"
                     className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-ink hover:bg-paper"
                   >
                     <UserRound className="h-4 w-4 text-muted" aria-hidden />
-                    View profile
+                    Profile
                   </Link>
                   <button
                     type="button"
@@ -115,7 +124,7 @@ export function Header() {
         </div>
         <button
           type="button"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-line md:hidden"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-line text-ink transition hover:bg-paper md:hidden"
           aria-label={open ? "Close menu" : "Open menu"}
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
@@ -124,13 +133,16 @@ export function Header() {
         </button>
       </div>
       {open ? (
-        <div className="border-t border-line bg-elevated px-4 py-4 md:hidden">
-          <nav className="flex flex-col gap-1" aria-label="Mobile">
+        <div className="border-t border-line bg-elevated px-4 py-3 md:hidden">
+          <nav className="flex flex-col gap-0.5" aria-label="Mobile">
             {links.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="rounded-md px-3 py-2.5 text-sm font-medium text-ink hover:bg-paper"
+                className={cn(
+                  "rounded-md px-3 py-2.5 text-sm font-medium",
+                  isActive(pathname, link.href) ? "bg-paper text-ink" : "text-ink hover:bg-paper",
+                )}
                 onClick={() => setOpen(false)}
               >
                 {link.label}
@@ -138,17 +150,32 @@ export function Header() {
             ))}
             {!user ? (
               <>
-                <Link href="/login" className="rounded-md px-3 py-2.5 text-sm" onClick={() => setOpen(false)}>
+                <Link
+                  href="/login"
+                  className="rounded-md px-3 py-2.5 text-sm text-muted"
+                  onClick={() => setOpen(false)}
+                >
                   Sign in
                 </Link>
-                <Link href="/register" className="rounded-md px-3 py-2.5 text-sm font-medium text-accent" onClick={() => setOpen(false)}>
+                <Link
+                  href="/register"
+                  className="rounded-md px-3 py-2.5 text-sm font-semibold text-accent"
+                  onClick={() => setOpen(false)}
+                >
                   Create account
                 </Link>
               </>
             ) : (
               <>
-                <div className="my-2 flex items-center gap-3 rounded-xl bg-paper p-3">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-accent to-ink text-xs font-bold text-white">
+                <Link
+                  href="/profile"
+                  className="rounded-md px-3 py-2.5 text-sm font-medium text-ink"
+                  onClick={() => setOpen(false)}
+                >
+                  Profile
+                </Link>
+                <div className="my-2 flex items-center gap-3 rounded-xl border border-line bg-paper p-3">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent text-xs font-bold text-white">
                     {initials}
                   </span>
                   <div className="min-w-0">
