@@ -39,17 +39,17 @@ services:
       - key: PERPLEXITY_API_KEY
         sync: false
 
-  # Daily scheduled ingest via Render Cron Job (exits when finished; ~$1/mo minimum).
-  # Prefer this over a always-on background worker for a once-per-day crawl.
+  # Daily full crawl at 06:00 Pakistan Time (PKT = UTC+5) → 01:00 UTC.
+  # Starter plan required for long multi-source + local embed runs.
   - type: cron
     name: remote-atlas-ingest
     runtime: python
     plan: starter
     region: singapore
     rootDir: backend
-    schedule: "0 6 * * *"
+    schedule: "0 1 * * *"
     buildCommand: pip install --upgrade pip && pip install -r requirements.txt
-    startCommand: python -m app.deploy cron
+    startCommand: python -m app.deploy cron --embed
     autoDeployTrigger: commit
     envVars:
       - key: DATABASE_URL
