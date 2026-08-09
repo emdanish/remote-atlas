@@ -11,6 +11,15 @@ import { SaveJobButton } from "@/components/jobs/SaveJobButton";
 import { TrackedApplyButton } from "@/components/jobs/TrackedApplyButton";
 import { getJob, searchJobs, SITE_URL } from "@/lib/api";
 import {
+  buildBreadcrumbJsonLd,
+  buildJobPostingJsonLd,
+  DEFAULT_FRESHNESS_DAYS,
+  isJobIndexable,
+  jobSeoDescription,
+  jobSeoTitle,
+  safeJsonLd,
+} from "@/lib/seo";
+import {
   formatRelativeDate,
   officialApplyUrl,
   sourceKindLabel,
@@ -24,23 +33,35 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   try {
     const job = await getJob(Number(id));
-    const title = `${job.title} at ${job.company_name}`;
-    const description =
-      job.description_text?.slice(0, 160) ||
-      `${job.title} · ${job.company_name} · Apply on the official career page via Remote Atlas.`;
+    const title = jobSeoTitle(job);
+    const description = jobSeoDescription(job);
+    const indexable = isJobIndexable(job, DEFAULT_FRESHNESS_DAYS);
+    const path = `/jobs/${job.id}`;
     return {
       title,
       description,
-      alternates: { canonical: `/jobs/${job.id}` },
+      alternates: { canonical: path },
+      robots: indexable
+        ? { index: true, follow: true }
+        : { index: false, follow: true },
       openGraph: {
         title,
         description,
-        url: `${SITE_URL}/jobs/${job.id}`,
+        url: `${SITE_URL}${path}`,
         type: "article",
+        siteName: "Remote Atlas",
+      },
+      twitter: {
+        card: "summary_large_image",
+        title,
+        description,
       },
     };
   } catch {
-    return { title: "Job not found" };
+    return {
+      title: "Job not found",
+      robots: { index: false, follow: true },
+    };
   }
 }
 
@@ -71,31 +92,29 @@ export default async function JobDetailPage({ params }: Props) {
   }
 
   const applyUrl = officialApplyUrl(job);
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "JobPosting",
-    title: job.title,
-    description: job.description_text || job.title,
-    datePosted: job.posted_at || job.first_seen_at,
-    hiringOrganization: {
-      "@type": "Organization",
-      name: job.company_name,
-      sameAs: job.company_url || job.career_page_url || undefined,
-    },
-    jobLocationType:
-      job.workplace_type === "remote" ? "TELECOMMUTE" : undefined,
-    employmentType: job.employment_type || undefined,
-    url: `${SITE_URL}/jobs/${job.id}`,
-    directApply: Boolean(applyUrl),
-  };
+  const indexable = isJobIndexable(job, DEFAULT_FRESHNESS_DAYS);
+  const postingLd = buildJobPostingJsonLd(job, {
+    freshnessDays: DEFAULT_FRESHNESS_DAYS,
+  });
+  const breadcrumbLd = buildBreadcrumbJsonLd([
+    { name: "Home", path: "/" },
+    { name: "Jobs", path: "/jobs" },
+    { name: job.title, path: `/jobs/${job.id}` },
+  ]);
 
   const tags = uniqueLabels(job.tech_tags, job.skills).slice(0, 16);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+      {postingLd ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: safeJsonLd(postingLd) }}
+        />
+      ) : null}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(breadcrumbLd) }}
       />
 
       <nav aria-label="Breadcrumb" className="mb-6 flex flex-wrap items-center gap-1 text-sm text-muted">
@@ -110,8 +129,19 @@ export default async function JobDetailPage({ params }: Props) {
         <span className="text-ink line-clamp-1">{job.title}</span>
       </nav>
 
+      {!indexable ? (
+        <div
+          className="mb-6 rounded-xl border border-line bg-elevated px-4 py-3 text-sm text-muted"
+          role="status"
+        >
+          This listing is no longer in the active Remote Atlas index (
+          {job.is_active === false ? "closed or removed from source" : "outside the freshness window"}
+          ). It is kept for reference and is not offered as a current opportunity.
+        </div>
+      ) : null}
+
       <div className="grid gap-10 lg:grid-cols-[1fr_280px]">
-        <article>
+        <article itemScope itemType="https://schema.org/JobPosting">
           <div className="flex flex-wrap gap-2">
             <Badge tone="accent">{job.source}</Badge>
             {job.source_kind || job.source_kind_label ? (
@@ -123,34 +153,49 @@ export default async function JobDetailPage({ params }: Props) {
             ) : null}
             {job.employment_type ? <Badge>{job.employment_type}</Badge> : null}
           </div>
-          <h1 className="mt-4 font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
+          <h1
+            className="mt-4 font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl"
+            itemProp="title"
+          >
             {job.title}
           </h1>
-          <p className="mt-2 text-lg font-medium text-ink/80">{job.company_name}</p>
+          <p className="mt-2 text-lg font-medium text-ink/80" itemProp="hiringOrganization">
+            {job.company_name}
+          </p>
           <div className="mt-3 flex flex-wrap gap-4 text-sm text-muted">
             {job.location_raw ? (
               <span className="inline-flex items-center gap-1.5">
                 <MapPin className="h-4 w-4" aria-hidden />
-                {job.location_raw}
+                <span itemProp="jobLocation">{job.location_raw}</span>
               </span>
             ) : null}
-            <span>Posted {formatRelativeDate(job.posted_at || job.first_seen_at)}</span>
+            <span>
+              Posted {formatRelativeDate(job.posted_at || job.first_seen_at)}
+            </span>
           </div>
 
           {tags.length ? (
-            <ul className="mt-6 flex flex-wrap gap-2">
+            <ul className="mt-6 flex flex-wrap gap-2" aria-label="Skills and technologies">
               {tags.map((t) => (
                 <li
                   key={t.toLowerCase()}
                   className="rounded-md border border-line bg-paper px-2.5 py-1 text-xs font-medium text-muted"
                 >
-                  {t}
+                  <Link
+                    href={`/jobs?skills=${encodeURIComponent(t)}`}
+                    className="hover:text-accent"
+                  >
+                    {t}
+                  </Link>
                 </li>
               ))}
             </ul>
           ) : null}
 
-          <div className="prose-atlas mt-10 whitespace-pre-wrap text-[15px] leading-relaxed text-ink/90">
+          <div
+            className="prose-atlas mt-10 whitespace-pre-wrap text-[15px] leading-relaxed text-ink/90"
+            itemProp="description"
+          >
             {job.description_text || "No description provided by the source."}
           </div>
 
@@ -172,7 +217,7 @@ export default async function JobDetailPage({ params }: Props) {
               Remote Atlas does not host applications. You apply on the company&apos;s system.
             </p>
             <div className="mt-4 flex flex-col gap-2">
-              {applyUrl ? (
+              {applyUrl && indexable ? (
                 <TrackedApplyButton
                   jobId={job.id}
                   applyUrl={applyUrl}
@@ -180,6 +225,10 @@ export default async function JobDetailPage({ params }: Props) {
                   size="md"
                   showDestination
                 />
+              ) : applyUrl && !indexable ? (
+                <Button href={applyUrl} external variant="secondary" size="md">
+                  View original posting
+                </Button>
               ) : null}
               <SaveJobButton jobId={job.id} />
               {job.career_page_url ? (
@@ -208,12 +257,19 @@ export default async function JobDetailPage({ params }: Props) {
               </div>
             </dl>
           </div>
+          <p className="text-xs text-muted">
+            <Link href="/jobs" className="font-medium text-accent hover:underline">
+              Browse all fresh jobs
+            </Link>
+          </p>
         </aside>
       </div>
 
       {related.length ? (
-        <section className="mt-16">
-          <h2 className="font-display text-2xl font-semibold text-ink">Related roles</h2>
+        <section className="mt-16" aria-labelledby="related-roles-heading">
+          <h2 id="related-roles-heading" className="font-display text-2xl font-semibold text-ink">
+            Related roles
+          </h2>
           <div className="mt-6 space-y-4">
             {related.map((j, i) => (
               <JobCard key={j.id} job={j} index={i} />

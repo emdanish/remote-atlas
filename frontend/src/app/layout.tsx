@@ -6,6 +6,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { OnboardingBanner } from "@/components/onboarding/OnboardingBanner";
 import { SITE_URL } from "@/lib/api";
+import { absoluteUrl, safeJsonLd } from "@/lib/seo";
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -19,19 +20,38 @@ const fraunces = Fraunces({
   display: "swap",
 });
 
+const defaultTitle = "Remote Atlas | Candidate-first job discovery";
+const defaultDescription =
+  "Search fresh tech roles from authentic company career systems. Filters that match how candidates decide. Optional resume tailoring. Apply on the employer's official page.";
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Remote Atlas | Candidate-first job discovery",
+    default: defaultTitle,
     template: "%s · Remote Atlas",
   },
-  description:
-    "Search fresh tech roles from authentic company career systems. Filters that match how candidates decide. Optional resume tailoring. Apply on the employer's official page.",
+  description: defaultDescription,
   applicationName: "Remote Atlas",
+  authors: [{ name: "Remote Atlas" }],
+  creator: "Remote Atlas",
+  category: "jobs",
+  keywords: [
+    "remote jobs",
+    "tech jobs",
+    "software engineer jobs",
+    "developer jobs",
+    "job search",
+    "ATS jobs",
+    "Remote Atlas",
+  ],
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
     type: "website",
+    locale: "en_US",
     siteName: "Remote Atlas",
-    title: "Remote Atlas | Candidate-first job discovery",
+    title: defaultTitle,
     description:
       "Fresh roles from trusted sources. Semantic + keyword search. Resume tailoring without inventing experience.",
     url: SITE_URL,
@@ -41,9 +61,23 @@ export const metadata: Metadata = {
     title: "Remote Atlas",
     description: "A job search engine built for candidates — not recruiters.",
   },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
   icons: {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
     apple: [{ url: "/icon.svg" }],
+  },
+  other: {
+    "theme-color": "#0B1F1A",
   },
 };
 
@@ -52,7 +86,9 @@ const orgJsonLd = {
   "@type": "Organization",
   name: "Remote Atlas",
   url: SITE_URL,
-  description: "Developer-focused job discovery engine with verified official apply links.",
+  logo: absoluteUrl("/brand/logo.svg"),
+  description:
+    "Developer-focused job discovery engine with verified official apply links and a strict freshness window.",
 };
 
 const siteJsonLd = {
@@ -62,7 +98,10 @@ const siteJsonLd = {
   url: SITE_URL,
   potentialAction: {
     "@type": "SearchAction",
-    target: `${SITE_URL}/jobs?q={search_term_string}`,
+    target: {
+      "@type": "EntryPoint",
+      urlTemplate: `${SITE_URL}/jobs?q={search_term_string}`,
+    },
     "query-input": "required name=search_term_string",
   },
 };
@@ -77,11 +116,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="flex min-h-screen flex-col font-sans antialiased">
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: safeJsonLd(orgJsonLd) }}
         />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: safeJsonLd(siteJsonLd) }}
         />
         <AppProviders>
           <a

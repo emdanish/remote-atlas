@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -11,6 +12,22 @@ import { Button } from "@/components/ui/Button";
 import { Reveal } from "@/components/marketing/Reveal";
 import { StatCounter } from "@/components/marketing/StatCounter";
 import { getIngestStats } from "@/lib/api";
+import { safeJsonLd } from "@/lib/seo";
+
+export const metadata: Metadata = {
+  title: {
+    absolute: "Remote Atlas | Candidate-first job discovery",
+  },
+  description:
+    "A job search engine for candidates: fresh tech roles from official career systems, intent-aware search, and optional resume tailoring. Apply on the employer’s page.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "Remote Atlas | Candidate-first job discovery",
+    description:
+      "Fresh roles from trusted sources. Search what you want. Apply on the official career page.",
+    url: "/",
+  },
+};
 
 export default async function LandingPage() {
   let stats: {
@@ -41,8 +58,45 @@ export default async function LandingPage() {
 
   const updatedLabel = formatIndexAge(stats?.lastSourceRun ?? null);
 
+  const freshness = stats?.freshness ?? 14;
+  const faqItems = [
+    {
+      q: "Where do the jobs come from?",
+      a: "Public applicant tracking systems and reputable public feeds. We index them; we do not invent listings.",
+    },
+    {
+      q: "How fresh is the index?",
+      a: `Active roles must fall within the ${freshness}-day freshness window. Re-seeing a listing does not make an old posting “new.”`,
+    },
+    {
+      q: "Is Remote Atlas free to search?",
+      a: "Yes. Create an account when you want saves, matches, alerts, and resume tailoring history.",
+    },
+    {
+      q: "Does tailoring change my original file?",
+      a: "No. Your uploaded original remains stored. Tailored PDFs are generated as separate artifacts.",
+    },
+  ];
+
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqItems.map((item) => ({
+      "@type": "Question",
+      name: item.q,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: item.a,
+      },
+    })),
+  };
+
   return (
     <div>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(faqJsonLd) }}
+      />
       {/* Hero — brand first, one composition */}
       <section className="relative overflow-hidden border-b border-line bg-ink text-white">
         <div className="absolute inset-0 atlas-dark-grid opacity-60" aria-hidden />
@@ -289,24 +343,7 @@ export default async function LandingPage() {
             </h2>
           </div>
           <div className="space-y-3">
-            {[
-              {
-                q: "Where do the jobs come from?",
-                a: "Public applicant tracking systems and reputable public feeds. We index them; we do not invent listings.",
-              },
-              {
-                q: "How fresh is the index?",
-                a: `Active roles must fall within the ${stats?.freshness ?? 14}-day freshness window. Re-seeing a listing does not make an old posting “new.”`,
-              },
-              {
-                q: "Is Remote Atlas free to search?",
-                a: "Yes. Create an account when you want saves, matches, alerts, and resume tailoring history.",
-              },
-              {
-                q: "Does tailoring change my original file?",
-                a: "No. Your uploaded original remains stored. Tailored PDFs are generated as separate artifacts.",
-              },
-            ].map((item) => (
+            {faqItems.map((item) => (
               <details
                 key={item.q}
                 className="group rounded-xl border border-line bg-paper px-5 py-4 open:bg-elevated open:shadow-soft"

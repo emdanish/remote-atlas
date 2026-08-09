@@ -1,15 +1,15 @@
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db.session import get_db
 from app.models import Job
-from app.pipeline.freshness import is_fresh
+from app.pipeline.freshness import freshness_cutoff, is_fresh
 from app.pipeline.source_trust import source_kind, source_kind_label
-from app.schemas import JobOut, JobSearchResponse
+from app.schemas import JobOut, JobSearchResponse, SitemapEntriesResponse, SitemapJobEntry
 from app.search.fts import search_jobs
 from app.search.hybrid import hybrid_search
 from app.search.intent import parse_intent
@@ -126,6 +126,55 @@ async def jobs_search(
         page_size=page_size,
         freshness_days=settings.freshness_days,
         results=results,
+    )
+
+
+@router.get("/sitemap-entries", response_model=SitemapEntriesResponse)
+async def jobs_sitemap_entries(
+    request: Request,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(5000, ge=1, le=10000),
+    db: AsyncSession = Depends(get_db),
+) -> SitemapEntriesResponse:
+    """
+    Lightweight public feed for XML sitemaps.
+    Active + fresh jobs only — no descriptions or private data.
+    """
+    await enforce_rate_limit(request, "job-sitemap", limit=30)
+    settings = get_settings()
+    cutoff = freshness_cutoff(settings.freshness_days)
+    fresh_clause = or_(
+        Job.posted_at >= cutoff,
+        (Job.posted_at.is_(None)) & (Job.first_seen_at >= cutoff),
+    )
+
+    count_result = await db.execute(
+        select(func.count())
+        .select_from(Job)
+        .where(Job.is_active.is_(True), fresh_clause)
+    )
+    total = int(count_result.scalar_one() or 0)
+
+    last_mod = func.coalesce(Job.posted_at, Job.last_seen_at, Job.first_seen_at)
+    result = await db.execute(
+        select(Job.id, last_mod.label("last_modified"))
+        .where(Job.is_active.is_(True), fresh_clause)
+        .order_by(Job.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    rows = result.all()
+    entries = [
+        SitemapJobEntry(id=int(row.id), last_modified=row.last_modified)
+        for row in rows
+        if row.last_modified is not None
+    ]
+    return SitemapEntriesResponse(
+        total=total,
+        page=page,
+        page_size=page_size,
+        freshness_days=settings.freshness_days,
+        entries=entries,
     )
 
 

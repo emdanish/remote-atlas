@@ -42,6 +42,21 @@ class JobSearchResponse(BaseModel):
     results: list[JobOut]
 
 
+class SitemapJobEntry(BaseModel):
+    """Minimal job row for XML sitemaps (public, non-sensitive)."""
+
+    id: int
+    last_modified: datetime
+
+
+class SitemapEntriesResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    freshness_days: int
+    entries: list[SitemapJobEntry]
+
+
 class HealthResponse(BaseModel):
     status: str
     database: str

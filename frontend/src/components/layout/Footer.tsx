@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { Logo } from "@/components/brand/Logo";
 
-const links = [
+const productLinks = [
   { href: "/jobs", label: "Browse jobs" },
+  { href: "/jobs?workplace=remote", label: "Remote roles" },
   { href: "/register", label: "Create account" },
   { href: "/login", label: "Sign in" },
 ];
@@ -22,7 +23,7 @@ export function Footer() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-muted">Product</p>
           <ul className="mt-3 space-y-2">
-            {links.map((l) => (
+            {productLinks.map((l) => (
               <li key={l.href}>
                 <Link href={l.href} className="text-sm text-ink hover:text-accent">
                   {l.label}
