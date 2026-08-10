@@ -43,7 +43,12 @@ class Settings(BaseSettings):
     freshness_days: int = 30
     ingest_concurrency: int = 24
     embedding_dimensions: int = 768
-    embed_batch_size: int = 800
+    # How many jobs to load from DB per embed wave (keep small on 512Mi dynos)
+    embed_batch_size: int = 48
+    # Texts per local ONNX/Gemini slice
+    embed_chunk_size: int = 4
+    # Cap per embed process so cron finishes before OOM / time-out; next day continues
+    embed_max_per_run: int = 400
     # gemini | local | auto | none/off/fts (none = never load local models; FTS-only search)
     embed_provider: str = "local"
     embed_max_consecutive_failures: int = 3

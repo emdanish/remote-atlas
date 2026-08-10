@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import subprocess
 import sys
 
 from alembic import command
@@ -79,12 +80,57 @@ def exec_worker(interval_minutes: int, embed: bool) -> None:
     os.execvp(sys.executable, arguments)
 
 
+def _low_ram_env() -> dict[str, str]:
+    env = os.environ.copy()
+    env.setdefault("OMP_NUM_THREADS", "1")
+    env.setdefault("MKL_NUM_THREADS", "1")
+    env.setdefault("OPENBLAS_NUM_THREADS", "1")
+    env.setdefault("NUMEXPR_NUM_THREADS", "1")
+    env.setdefault("ORT_NUM_THREADS", "1")
+    env.setdefault("TOKENIZERS_PARALLELISM", "false")
+    return env
+
+
+def _run_step(label: str, arguments: list[str]) -> int:
+    logger.info("Starting step: %s | cmd=%s", label, " ".join(arguments))
+    completed = subprocess.run(arguments, env=_low_ram_env(), check=False)
+    if completed.returncode != 0:
+        logger.error("Step failed: %s | exit_code=%s", label, completed.returncode)
+    else:
+        logger.info("Step finished: %s | exit_code=0", label)
+    return completed.returncode
+
+
 def exec_cron(embed: bool) -> None:
-    """One-shot ingestion for Render Cron Jobs. Process must exit when finished."""
-    arguments = [sys.executable, "-m", "app.scheduler", "--once"]
-    if embed:
-        arguments.append("--embed")
-    os.execvp(sys.executable, arguments)
+    """One-shot ingestion for Render Cron Jobs with process isolation.
+
+    Critical: crawl + ONNX embedding in the *same* process OOMs 512Mi dynos
+    (ingest alone used most of the heap; loading BGE then fails). Run:
+
+    1. crawl/housekeeping as process A (exits → OS reclaims memory)
+    2. embed as process B (fresh heap for the model)
+
+    Jobs stay fully searchable via FTS if embeds fail or partial.
+    """
+    crawl_code = _run_step(
+        "ingest",
+        [sys.executable, "-m", "app.scheduler", "--once", "--ingest-only"],
+    )
+    if crawl_code != 0:
+        sys.exit(crawl_code)
+
+    if not embed:
+        sys.exit(0)
+
+    embed_code = _run_step(
+        "embed",
+        [sys.executable, "-m", "app.ingest", "embed"],
+    )
+    # Non-zero embed should not hide successful crawl for monitoring, but
+    # we still fail the cron so Render re-tries / alerts. FTS works either way.
+    if embed_code != 0:
+        sys.exit(embed_code)
+    sys.exit(0)
 
 
 def main() -> None:
@@ -99,7 +145,7 @@ def main() -> None:
     cron.add_argument(
         "--embed",
         action="store_true",
-        help="Also embed this cycle (off by default; FTS still works)",
+        help="After crawl, run embeddings in a separate process (recommended)",
     )
     args = parser.parse_args()
 

@@ -35,7 +35,7 @@ from app.collectors import (
 from app.config import get_settings
 from app.db.session import AsyncSessionLocal
 from app.models import Company, IngestRun
-from app.pipeline.freshness import expire_stale_jobs
+from app.pipeline.freshness import expire_stale_jobs, purge_expired_jobs
 from app.pipeline.normalize import NormalizedJob
 from app.pipeline.upsert import (
     deactivate_unseen_for_sources,
@@ -152,6 +152,14 @@ async def record_run(
 
 
 async def maybe_embed_missing(session, limit: int | None = None) -> int:
+    """Embed active jobs missing vectors, memory-safe for 512Mi dynos.
+
+    Processes at most ``embed_max_per_run`` (or *limit*) jobs, in small DB waves
+    and tiny model chunks. Designed to run in a **fresh process** after crawl
+    (see ``deploy.exec_cron``) so ONNX is not loaded on top of crawl RSS.
+    """
+    import gc
+
     settings = get_settings()
     from app.ai.provider import embedding_provider_name
 
@@ -160,6 +168,9 @@ async def maybe_embed_missing(session, limit: int | None = None) -> int:
         logger.info("No configured embedding provider is available; skipping embeddings")
         return 0
     provider = (settings.embed_provider or "auto").lower()
+    if provider in {"none", "off", "fts", "disabled"}:
+        logger.info("EMBED_PROVIDER=%s — skipping embeddings (FTS still works)", provider)
+        return 0
     if provider == "gemini" and not settings.gemini_keys:
         logger.info("No Gemini API keys set; skipping embeddings")
         return 0
@@ -172,50 +183,61 @@ async def maybe_embed_missing(session, limit: int | None = None) -> int:
 
     from app.ai.provider import embed_texts
     from app.models import Job
-    from app.search.local_embeddings import local_available, local_embed_texts
+    from app.search.local_embeddings import local_available, local_embed_texts, unload_local_model
+    from app.pipeline.freshness import freshness_cutoff
 
-    batch = limit or settings.embed_batch_size
-    result = await session.execute(
-        select(Job)
-        .where(Job.is_active.is_(True))
-        .where(Job.apply_url.is_not(None))
-        .where(
-            or_(
-                Job.embedding.is_(None),
-                Job.embedding_hash.is_(None),
-                Job.embedding_provider.is_(None),
-                Job.embedding_provider != provider_name,
-            )
-        )
-        .order_by(Job.last_seen_at.desc())
-        .limit(batch)
+    max_jobs = limit if limit is not None else settings.embed_max_per_run
+    wave = max(8, min(settings.embed_batch_size, max_jobs))
+    chunk = max(1, settings.embed_chunk_size)
+    use_local = provider == "local" or (
+        provider == "auto" and (not settings.gemini_keys or False)
     )
-    jobs = list(result.scalars().all())
-    if not jobs:
-        logger.info("Embedded 0 jobs (none pending)")
-        return 0
+    if provider == "auto" and settings.gemini_keys:
+        use_local = False
+    consecutive_fail = 0
+    max_fail = settings.embed_max_consecutive_failures
+    updated = 0
+    cutoff = freshness_cutoff(settings.freshness_days)
 
-    docs: list[str] = []
-    hashes: list[str] = []
-    eligible: list = []
-    for job in jobs:
-        h = job_embedding_hash(
-            job.title,
-            job.company_name,
-            job.skills or [],
-            job.career_stage,
-            job.workplace_type,
-            job.description_text,
+    while updated < max_jobs:
+        remaining = max_jobs - updated
+        batch_limit = min(wave, remaining)
+        result = await session.execute(
+            select(Job.id)
+            .where(Job.is_active.is_(True))
+            .where(Job.apply_url.is_not(None))
+            .where(
+                or_(
+                    Job.posted_at >= cutoff,
+                    (Job.posted_at.is_(None)) & (Job.first_seen_at >= cutoff),
+                )
+            )
+            .where(
+                or_(
+                    Job.embedding.is_(None),
+                    Job.embedding_hash.is_(None),
+                    Job.embedding_provider.is_(None),
+                    Job.embedding_provider != provider_name,
+                )
+            )
+            .order_by(Job.last_seen_at.desc())
+            .limit(batch_limit)
         )
-        if (
-            job.embedding is not None
-            and job.embedding_hash == h
-            and job.embedding_provider == provider_name
-        ):
-            continue
-        hashes.append(h)
-        docs.append(
-            job_embedding_document(
+        ids = [row[0] for row in result.all()]
+        if not ids:
+            break
+
+        jobs_result = await session.execute(select(Job).where(Job.id.in_(ids)))
+        jobs = list(jobs_result.scalars().all())
+        if not jobs:
+            break
+
+        docs: list[str] = []
+        hashes: list[str] = []
+        eligible: list = []
+        provider_fixed = 0
+        for job in jobs:
+            h = job_embedding_hash(
                 job.title,
                 job.company_name,
                 job.skills or [],
@@ -223,83 +245,110 @@ async def maybe_embed_missing(session, limit: int | None = None) -> int:
                 job.workplace_type,
                 job.description_text,
             )
-        )
-        eligible.append(job)
-
-    if not eligible:
-        logger.info("Embedded 0 jobs (hashes already current)")
-        return 0
-
-    use_local = provider == "local" or (
-        provider == "auto" and (not settings.gemini_keys or False)
-    )
-    # Prefer local when configured, or after Gemini circuit opens
-    consecutive_fail = 0
-    max_fail = settings.embed_max_consecutive_failures
-    chunk = 32 if use_local or provider == "local" else 16
-    updated = 0
-
-    for start in range(0, len(docs), chunk):
-        end = min(start + chunk, len(docs))
-        part = docs[start:end]
-        success = False
-        for attempt in range(4):
-            try:
-                if use_local or provider == "local":
-                    vecs = await local_embed_texts(part)
-                else:
-                    vecs = await embed_texts(part)
-                    # If Gemini returned empty under auto, switch to local for rest
-                    if not vecs and provider == "auto" and local_available():
-                        logger.warning("Gemini returned empty; switching to local embeddings")
-                        use_local = True
-                        vecs = await local_embed_texts(part)
-                if not vecs or len(vecs) != len(part):
-                    raise RuntimeError(f"embed returned {0 if not vecs else len(vecs)} vectors")
-                for i, v in enumerate(vecs):
-                    job = eligible[start + i]
-                    job.embedding = v
-                    job.embedding_hash = hashes[start + i]
+            if job.embedding is not None and job.embedding_hash == h:
+                # Already embedded for this content; only sync provider label if needed
+                if job.embedding_provider != provider_name:
                     job.embedding_provider = provider_name
-                    updated += 1
-                success = True
-                consecutive_fail = 0
-                break
-            except Exception as exc:  # noqa: BLE001
-                msg = str(exc)
-                if "429" in msg or "Too Many" in msg or "RESOURCE_EXHAUSTED" in msg:
-                    consecutive_fail += 1
-                    wait = min(60, 8 * (attempt + 1))
-                    logger.warning(
-                        "Embed rate-limited; sleeping %ss (attempt %s, streak %s)",
-                        wait,
-                        attempt + 1,
-                        consecutive_fail,
-                    )
-                    if consecutive_fail >= max_fail and provider == "auto" and local_available():
-                        logger.warning("Gemini quota circuit open — switching to local embeddings")
-                        use_local = True
-                        consecutive_fail = 0
-                        continue
-                    if consecutive_fail >= max_fail and provider == "gemini":
-                        logger.error("Gemini quota exhausted; stopping embed pass early")
-                        if updated:
-                            await session.commit()
-                        return updated
-                    await asyncio.sleep(wait)
-                    continue
-                logger.warning("Embed slice %s-%s failed: %s", start, end, exc)
-                consecutive_fail += 1
-                break
-        if success and not use_local:
-            await asyncio.sleep(1.0)
-        if updated and updated % 64 == 0:
-            await session.commit()
-            logger.info("Embedded progress %s / %s", updated, len(eligible))
+                    provider_fixed += 1
+                continue
+            hashes.append(h)
+            docs.append(
+                job_embedding_document(
+                    job.title,
+                    job.company_name,
+                    job.skills or [],
+                    job.career_stage,
+                    job.workplace_type,
+                    job.description_text,
+                )
+            )
+            eligible.append(job)
 
-    if updated:
-        await session.commit()
-    logger.info("Embedded %s / %s pending jobs", updated, len(eligible))
+        if provider_fixed:
+            await session.commit()
+
+        if not eligible:
+            if not provider_fixed:
+                break
+            continue
+
+        wave_updated = 0
+        for start in range(0, len(docs), chunk):
+            end = min(start + chunk, len(docs))
+            part = docs[start:end]
+            success = False
+            for attempt in range(4):
+                try:
+                    if use_local or provider == "local":
+                        vecs = await local_embed_texts(part, batch_size=chunk)
+                    else:
+                        vecs = await embed_texts(part)
+                        if not vecs and provider == "auto" and local_available():
+                            logger.warning("Gemini returned empty; switching to local embeddings")
+                            use_local = True
+                            vecs = await local_embed_texts(part, batch_size=chunk)
+                    if not vecs or len(vecs) != len(part):
+                        raise RuntimeError(
+                            f"embed returned {0 if not vecs else len(vecs)} vectors"
+                        )
+                    for i, v in enumerate(vecs):
+                        job = eligible[start + i]
+                        job.embedding = v
+                        job.embedding_hash = hashes[start + i]
+                        job.embedding_provider = provider_name
+                        updated += 1
+                        wave_updated += 1
+                    success = True
+                    consecutive_fail = 0
+                    break
+                except Exception as exc:  # noqa: BLE001
+                    msg = str(exc)
+                    if "429" in msg or "Too Many" in msg or "RESOURCE_EXHAUSTED" in msg:
+                        consecutive_fail += 1
+                        wait = min(60, 8 * (attempt + 1))
+                        logger.warning(
+                            "Embed rate-limited; sleeping %ss (attempt %s, streak %s)",
+                            wait,
+                            attempt + 1,
+                            consecutive_fail,
+                        )
+                        if consecutive_fail >= max_fail and provider == "auto" and local_available():
+                            logger.warning(
+                                "Gemini quota circuit open — switching to local embeddings"
+                            )
+                            use_local = True
+                            consecutive_fail = 0
+                            continue
+                        if consecutive_fail >= max_fail and provider == "gemini":
+                            logger.error("Gemini quota exhausted; stopping embed pass early")
+                            if updated:
+                                await session.commit()
+                            unload_local_model()
+                            return updated
+                        await asyncio.sleep(wait)
+                        continue
+                    logger.warning("Embed slice %s-%s failed: %s", start, end, exc)
+                    consecutive_fail += 1
+                    break
+            if success:
+                await session.commit()
+                if not use_local:
+                    await asyncio.sleep(0.25)
+            if updated % 32 == 0 and updated:
+                logger.info("Embedded progress %s (max this run %s)", updated, max_jobs)
+            # Encourage memory return between slices on tiny dynos
+            if use_local and (start // chunk) % 8 == 7:
+                gc.collect()
+
+        if wave_updated == 0:
+            # No progress — avoid infinite loop if rows keep reappearing
+            break
+        # Free description text references before next wave
+        del docs, hashes, eligible, jobs
+        gc.collect()
+
+    unload_local_model()
+    logger.info("Embedded %s jobs this pass (cap=%s)", updated, max_jobs)
     return updated
 
 
@@ -467,11 +516,14 @@ async def run_ingest(sources: list[str] | None = None, embed: bool = True) -> No
         unseen = await deactivate_unseen_for_sources(session, successful_sources, t0)
         deactivated = await suppress_cross_source_duplicates(session)
         expired = await expire_stale_jobs(session)
+        purged = await purge_expired_jobs(session)
         logger.info(
-            "Housekeeping | unseen_deactivated=%s duplicates_deactivated=%s stale_expired=%s",
+            "Housekeeping | unseen_deactivated=%s duplicates_deactivated=%s "
+            "stale_expired=%s purged_past_window=%s",
             unseen,
             deactivated,
             expired,
+            purged,
         )
 
         jobs_elapsed = (datetime.now(timezone.utc) - t0).total_seconds()
@@ -535,31 +587,38 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Remote Atlas ingest CLI")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    run_parser = sub.add_parser("run", help="Fetch + upsert jobs, then batch-embed")
+    run_parser = sub.add_parser("run", help="Fetch + upsert jobs, then optional batch-embed")
     run_parser.add_argument("--sources", nargs="*", help="Subset of sources")
     run_parser.add_argument(
         "--embed",
         action="store_true",
-        help="Force embeddings on (default already on)",
+        help="Also embed in this process (prefer separate process via deploy cron)",
     )
     run_parser.add_argument(
         "--no-embed",
         action="store_true",
-        help="Skip embeddings (FTS still works; run `ingest embed` later)",
+        help="Skip embeddings (default for production crawl process)",
     )
 
-    embed_parser = sub.add_parser("embed", help="Batch-embed jobs missing vectors")
-    embed_parser.add_argument("--limit", type=int, default=None)
+    embed_parser = sub.add_parser("embed", help="Batch-embed jobs missing vectors (fresh process)")
+    embed_parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Max jobs this run (default: settings.embed_max_per_run)",
+    )
 
     args = parser.parse_args()
     if args.command == "run":
-        do_embed = not bool(args.no_embed)
+        # Default: no embed in same process (memory). Use --embed only for local convenience.
+        do_embed = bool(args.embed) and not bool(args.no_embed)
         asyncio.run(run_ingest(sources=args.sources, embed=do_embed))
     elif args.command == "embed":
 
         async def _embed() -> None:
             async with AsyncSessionLocal() as session:
-                await maybe_embed_missing(session, limit=args.limit)
+                n = await maybe_embed_missing(session, limit=args.limit)
+                logger.info("Embed CLI finished | embedded=%s", n)
 
         asyncio.run(_embed())
 

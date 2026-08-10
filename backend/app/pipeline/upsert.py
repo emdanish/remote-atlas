@@ -10,11 +10,31 @@ from app.models import Job
 from app.pipeline.enrich import is_pakistan_friendly_remote
 from sqlalchemy import func
 
-from app.pipeline.normalize import NormalizedJob, apply_url_is_usable
+from app.pipeline.normalize import NormalizedJob, apply_url_is_usable, canonical_apply_url
 from app.pipeline.description import normalize_job_description_fields
-from app.pipeline.source_trust import PREFERRED_SOURCES_ORDER
+from app.pipeline.source_trust import PREFERRED_SOURCES_ORDER, source_trust_rank
 
 UPSERT_CHUNK = 250
+
+
+def _apply_key(url: str | None) -> str | None:
+    """Stable apply URL key for in-batch + cross-source dedup."""
+    key = canonical_apply_url(url)
+    if not key:
+        return None
+    return key.lower().strip() or None
+
+
+def _prefer_job(a: NormalizedJob, b: NormalizedJob) -> bool:
+    """True if *a* should replace *b* when apply URL collides in one batch."""
+    ra = source_trust_rank(a.source)
+    rb = source_trust_rank(b.source)
+    if ra != rb:
+        return ra < rb  # lower rank = more preferred
+    # Prefer entry with more description context
+    a_len = len(a.description_text or "") + len(a.description_html or "")
+    b_len = len(b.description_text or "") + len(b.description_html or "")
+    return a_len > b_len
 
 
 def _row(job: NormalizedJob, now: datetime) -> dict:
@@ -74,15 +94,26 @@ async def upsert_jobs(session: AsyncSession, jobs: list[NormalizedJob]) -> int:
     if not jobs:
         return 0
 
-    # Deduplicate within batch — Postgres rejects ON CONFLICT affecting same row twice
-    deduped: dict[tuple[str, str], NormalizedJob] = {}
+    # Deduplicate within batch:
+    # 1) unique (source, external_id) — DB constraint / same ATS job on re-crawl
+    # 2) unique apply URL — same role never inserts twice in one batch from different paths
+    by_key: dict[tuple[str, str], NormalizedJob] = {}
+    by_apply: dict[str, NormalizedJob] = {}
     for j in jobs:
         url = (j.apply_url or "").strip()
         if not url or not apply_url_is_usable(url):
             continue
         key = (j.source, (j.external_id or "")[:240])
-        deduped[key] = j
-    jobs = list(deduped.values())
+        # Later row wins for same source+id (fresher fetch within batch)
+        by_key[key] = j
+    for j in by_key.values():
+        apply_key = _apply_key(j.apply_url)
+        if not apply_key:
+            continue
+        prev = by_apply.get(apply_key)
+        if prev is None or _prefer_job(j, prev):
+            by_apply[apply_key] = j
+    jobs = list(by_apply.values())
     if not jobs:
         return 0
 

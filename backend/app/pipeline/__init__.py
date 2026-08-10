@@ -1,5 +1,10 @@
 from app.pipeline.enrich import enrich_job_fields, extract_skills, is_pakistan_friendly_remote
-from app.pipeline.freshness import expire_stale_jobs, freshness_cutoff, is_fresh
+from app.pipeline.freshness import (
+    expire_stale_jobs,
+    freshness_cutoff,
+    is_fresh,
+    purge_expired_jobs,
+)
 from app.pipeline.normalize import NormalizedJob, html_to_text, infer_career_stage, infer_workplace_type
 from app.pipeline.upsert import upsert_jobs
 
@@ -14,5 +19,6 @@ __all__ = [
     "expire_stale_jobs",
     "freshness_cutoff",
     "is_fresh",
+    "purge_expired_jobs",
     "upsert_jobs",
 ]

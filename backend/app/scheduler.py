@@ -3,6 +3,7 @@
 Usage:
   python -m app.scheduler --interval-minutes 180
   python -m app.scheduler --once
+  python -m app.scheduler --once --ingest-only
   python -m app.scheduler --alerts-only
 """
 
@@ -54,9 +55,14 @@ def main() -> None:
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--alerts-only", action="store_true", help="Only run saved-search pulses")
     parser.add_argument(
+        "--ingest-only",
+        action="store_true",
+        help="Crawl + housekeeping only (no embeddings). Used by deploy cron process A.",
+    )
+    parser.add_argument(
         "--embed",
         action="store_true",
-        help="Also run embeddings after jobs (off by default)",
+        help="Also run embeddings in this process (prefer deploy cron which isolates embed)",
     )
     parser.add_argument("--sources", nargs="*")
     args = parser.parse_args()
@@ -65,14 +71,22 @@ def main() -> None:
         logger.info("Pulse alerts: %s", stats)
         return
     if args.once:
+        do_embed = bool(args.embed) and not bool(args.ingest_only)
+
         async def _once() -> None:
-            await run_ingest(sources=args.sources, embed=args.embed)
+            await run_ingest(sources=args.sources, embed=do_embed)
             stats = await run_alerts()
             logger.info("Pulse alerts: %s", stats)
 
         asyncio.run(_once())
         return
-    asyncio.run(loop(args.interval_minutes, embed=args.embed, sources=args.sources))
+    asyncio.run(
+        loop(
+            args.interval_minutes,
+            embed=bool(args.embed) and not bool(args.ingest_only),
+            sources=args.sources,
+        )
+    )
 
 
 if __name__ == "__main__":
