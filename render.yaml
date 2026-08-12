@@ -30,9 +30,9 @@ services:
         value: "2"
       - key: FRESHNESS_DAYS
         value: "30"
-      # Never load BGE/ONNX on the free web dyno (cron embeds jobs offline).
+      # Query-time embeddings via Gemini HTTP (768-d). Never load BGE/ONNX on web.
       - key: EMBED_PROVIDER
-        value: none
+        value: gemini
       - key: GEMINI_API_KEY_1
         sync: false
       - key: GEMINI_API_KEY_2
@@ -43,8 +43,8 @@ services:
         sync: false
 
   # Daily full crawl at 06:00 Pakistan Time (PKT = UTC+5) → 01:00 UTC.
-  # Starter plan; crawl and embed run as SEPARATE processes (see app.deploy.exec_cron)
-  # so BGE/ONNX is not loaded on top of crawl memory (avoids 512Mi OOM).
+  # Starter plan (512Mi). Ingest and embed run as SEPARATE processes.
+  # Production embeddings use Gemini HTTP — local BGE/ONNX OOMs at model load.
   - type: cron
     name: remote-atlas-ingest
     runtime: python
@@ -65,19 +65,13 @@ services:
       - key: INGEST_CONCURRENCY
         value: "8"
       - key: EMBED_PROVIDER
-        value: local
+        value: gemini
       - key: EMBED_BATCH_SIZE
-        value: "32"
+        value: "64"
       - key: EMBED_CHUNK_SIZE
-        value: "2"
+        value: "16"
       - key: EMBED_MAX_PER_RUN
-        value: "300"
-      - key: OMP_NUM_THREADS
-        value: "1"
-      - key: ORT_NUM_THREADS
-        value: "1"
-      - key: TOKENIZERS_PARALLELISM
-        value: "false"
+        value: "1500"
       - key: THE_MUSE_API_KEY
         sync: false
       - key: GEMINI_API_KEY_1

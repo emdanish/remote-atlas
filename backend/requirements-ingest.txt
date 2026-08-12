@@ -1,6 +1,8 @@
-# Heavy deps for ingestion / embedding only (Render Cron + local full crawl).
-# Do not install on the free-tier API web service.
+# Ingest cron deps (Render Cron + local full crawl).
+# Intentionally NO fastembed/onnxruntime — BGE load OOMs Render Starter 512Mi.
+# Production embeddings use Gemini HTTP (EMBED_PROVIDER=gemini).
+# For offline local BGE on a machine with ≥2GiB RAM:
+#   pip install -r requirements-local-embed.txt
 -r requirements.txt
-fastembed>=0.4.0
 pytest>=8.0.0
 pytest-asyncio>=0.24.0

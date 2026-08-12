@@ -43,15 +43,15 @@ class Settings(BaseSettings):
     freshness_days: int = 30
     ingest_concurrency: int = 24
     embedding_dimensions: int = 768
-    # How many jobs to load from DB per embed wave (keep small on 512Mi dynos)
-    embed_batch_size: int = 48
-    # Texts per local ONNX/Gemini slice
-    embed_chunk_size: int = 4
-    # Cap per embed process so cron finishes before OOM / time-out; next day continues
-    embed_max_per_run: int = 400
-    # gemini | local | auto | none/off/fts (none = never load local models; FTS-only search)
-    embed_provider: str = "local"
-    embed_max_consecutive_failures: int = 3
+    # Jobs loaded from DB per embed wave (bounded memory)
+    embed_batch_size: int = 64
+    # Texts per Gemini HTTP / local ONNX slice
+    embed_chunk_size: int = 16
+    # Cap per embed process; next cron continues the backlog
+    embed_max_per_run: int = 1500
+    # gemini (production) | local (high-RAM only) | auto | none
+    embed_provider: str = "gemini"
+    embed_max_consecutive_failures: int = 5
     companies_path: str = str(BACKEND_ROOT / "data" / "companies.yaml")
 
     @property

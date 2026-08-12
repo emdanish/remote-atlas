@@ -1,8 +1,12 @@
-"""Local embedding (BGE-base 768-d) tuned for small RAM cron dynos.
+"""Local embedding (BGE-base 768-d) for high-RAM hosts only.
 
-Render free/starter plan often has only 512Mi. Loading ONNX after a full crawl
-OOMs the same process. Cron therefore embeds in a *fresh* subprocess; this
-module still stays minimal: 1 thread, small batches, optional model unload.
+Production Render Starter cron is 512 MiB. Loading BAAI/bge-base-en-v1.5 via
+FastEmbed/ONNX exceeds that budget at *model initialization* (weights ~210MB on
+disk; RSS with ORT + Python + download buffers goes past 512Mi). Production
+therefore uses Gemini HTTP embeddings (same 768-d schema).
+
+Use this module only when EMBED_PROVIDER=local on a machine with enough RAM
+(roughly ≥2 GiB recommended). Install: pip install -r requirements-local-embed.txt
 """
 
 from __future__ import annotations
@@ -11,7 +15,6 @@ import asyncio
 import gc
 import logging
 import os
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +24,7 @@ _model = None
 
 
 def _apply_runtime_thread_limits() -> None:
-    """Reduce ONNX / BLAS / tokenizer parallelism (huge win under 512Mi)."""
+    """Reduce ONNX / BLAS / tokenizer parallelism."""
     os.environ.setdefault("OMP_NUM_THREADS", "1")
     os.environ.setdefault("MKL_NUM_THREADS", "1")
     os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
@@ -39,17 +42,15 @@ def _get_model():
         from fastembed import TextEmbedding
     except ImportError as exc:  # pragma: no cover
         raise RuntimeError(
-            "fastembed is not installed. Run: pip install fastembed"
+            "fastembed is not installed. Run: pip install -r requirements-local-embed.txt"
         ) from exc
     logger.info(
-        "Loading local embedding model %s (threads=1, low-RAM mode)",
+        "Loading local embedding model %s (threads=1) — requires ample RAM",
         _MODEL_NAME,
     )
-    # threads=1 prevents multi-threaded ORT from ballooning RSS on small dynos
     try:
         _model = TextEmbedding(model_name=_MODEL_NAME, threads=1)
     except TypeError:
-        # Older fastembed without threads kwarg
         _model = TextEmbedding(model_name=_MODEL_NAME)
     return _model
 
@@ -65,7 +66,6 @@ def local_embed_sync(texts: list[str], *, batch_size: int = 4) -> list[list[floa
     if not texts:
         return []
     model = _get_model()
-    # Small batch_size keeps peak ONNX / allocator overhead down.
     try:
         vectors = list(model.embed(texts, batch_size=max(1, batch_size)))
     except TypeError:

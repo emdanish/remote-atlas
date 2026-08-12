@@ -52,17 +52,29 @@ values are:
 | `JWT_SECRET` | Signing secret; Render generates this for the API |
 | `AUTH_COOKIE_SECURE` | Must be `true` in production |
 | `CORS_ORIGINS` | Exact comma-separated frontend origins, without paths |
-| `FRESHNESS_DAYS` | Active index window (product default: `14`) |
-| `GEMINI_API_KEY_1` / `GEMINI_API_KEY_2` | Optional server-side chat providers |
+| `FRESHNESS_DAYS` | Active index window (product default: `30`) |
+| `GEMINI_API_KEY_1` / `GEMINI_API_KEY_2` | Chat + **embeddings** (required for hybrid search in production) |
 | `DEEPSEEK_API_KEY` / `PERPLEXITY_API_KEY` | Optional chat fallbacks |
 | `THE_MUSE_API_KEY` | Optional higher-rate collector access |
-| `EMBED_PROVIDER` | `local` (recommended), `gemini`, or `auto` |
+| `EMBED_PROVIDER` | `gemini` (production), `local` (high-RAM only), `auto`, or `none` |
+| `EMBED_MAX_PER_RUN` | Incremental embed cap per cron (default `1500`) |
 
-Job embeddings default to local BGE, so ingestion and search do not consume the
-Gemini quota. The chat fallback order is Gemini 1, Gemini 2, DeepSeek, then
-Perplexity.
+### Embedding architecture
 
-To build embeddings in restartable batches:
+Production uses **Gemini `embedding-001` at 768 dimensions** over HTTPS — the same
+pgvector width as before. Local FastEmbed/`BAAI/bge-base-en-v1.5` exceeds Render
+Starter's **512 MiB** at model load (proven in production OOM logs), so it is not
+installed on the cron image.
+
+Daily cron (`python -m app.deploy cron --embed`):
+
+1. **Ingest process** — crawl, upsert, housekeeping, pulse alerts → `INGESTION STATUS = SUCCESS`
+2. **Embed process** — incremental Gemini pass for missing/changed/provider-mismatched jobs
+
+Embedding failure does **not** fail the cron after a successful ingest (jobs stay
+searchable via PostgreSQL FTS). The next run resumes the backlog. Content changes
+clear `embedding_hash` on upsert so re-embed is automatic. Hybrid search only
+uses vectors whose `embedding_provider` matches the live provider (no mixed spaces).
 
 ```bash
 python -m app.ingest embed --limit 800
@@ -75,7 +87,7 @@ Repeat until `/health/ingest` reports the desired coverage.
 The repository includes a Render Blueprint for:
 
 - `remote-atlas-api`: free-tier-compatible FastAPI web service.
-- `remote-atlas-ingest`: **Cron Job** that runs once per day (`0 6 * * *` UTC).
+- `remote-atlas-ingest`: **Cron Job** that runs once per day (`0 1 * * *` UTC = 06:00 PKT).
 
 Both services run Alembic before their commands (web startup / cron start). A
 PostgreSQL advisory lock prevents migration races. Render checks
@@ -145,16 +157,17 @@ python -m app.scheduler --once
 | Purpose | Command |
 |---|---|
 | API process | `python -m app.deploy web` |
-| Daily cron ingest | `python -m app.deploy cron` |
-| Manual one-shot | `python -m app.scheduler --once` |
-| One-shot with embeddings | `python -m app.scheduler --once --embed` |
+| Daily cron (ingest + embed) | `python -m app.deploy cron --embed` |
+| Manual ingest only | `python -m app.scheduler --once --ingest-only` |
+| Manual embed pass | `python -m app.ingest embed` |
 | Liveness | `GET /health` |
 | Readiness | `GET /health/ready` |
 | Inventory | `GET /health/ingest` |
 
-Routine cron runs deliberately skip embeddings (`--once` without `--embed`) so
-a Gemini/local model failure cannot block job freshness. Embed later with
-`python -m app.ingest embed` when capacity allows.
+Ingestion and embedding are separate processes. After a successful ingest, an
+embedding failure exits the cron with code 0 so Render does not treat the job
+index refresh as failed. Look for `INGESTION STATUS` and `EMBEDDING STATUS` in
+logs.
 
 ## Status
 

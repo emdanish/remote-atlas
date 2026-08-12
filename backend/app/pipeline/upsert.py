@@ -2,14 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import text
+from sqlalchemy import case, func, or_, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Job
 from app.pipeline.enrich import is_pakistan_friendly_remote
-from sqlalchemy import func
-
 from app.pipeline.normalize import NormalizedJob, apply_url_is_usable, canonical_apply_url
 from app.pipeline.description import normalize_job_description_fields
 from app.pipeline.source_trust import PREFERRED_SOURCES_ORDER, source_trust_rank
@@ -127,7 +125,18 @@ async def upsert_jobs(session: AsyncSession, jobs: list[NormalizedJob]) -> int:
             continue
         rows = [_row(j, now) for j in chunk]
         insert_stmt = insert(Job).values(rows)
-        # Prefer true posted_at from source over wiping with NULL when re-upserting
+        # Prefer true posted_at from source over wiping with NULL when re-upserting.
+        # Invalidate embedding_hash when embed-relevant fields change so the
+        # incremental embed pass re-queues the row (vectors themselves remain
+        # until overwritten — FTS/hybrid stay safe).
+        content_changed = or_(
+            Job.title.is_distinct_from(insert_stmt.excluded.title),
+            Job.company_name.is_distinct_from(insert_stmt.excluded.company_name),
+            Job.description_text.is_distinct_from(insert_stmt.excluded.description_text),
+            Job.skills.is_distinct_from(insert_stmt.excluded.skills),
+            Job.career_stage.is_distinct_from(insert_stmt.excluded.career_stage),
+            Job.workplace_type.is_distinct_from(insert_stmt.excluded.workplace_type),
+        )
         stmt = insert_stmt.on_conflict_do_update(
             constraint="uq_jobs_source_external_id",
             set_={
@@ -153,6 +162,10 @@ async def upsert_jobs(session: AsyncSession, jobs: list[NormalizedJob]) -> int:
                 "is_active": True,
                 "missed_runs": 0,
                 "updated_at": now,
+                "embedding_hash": case(
+                    (content_changed, None),
+                    else_=Job.embedding_hash,
+                ),
             },
         ).returning(Job.id)
         result = await session.execute(stmt)

@@ -80,20 +80,9 @@ def exec_worker(interval_minutes: int, embed: bool) -> None:
     os.execvp(sys.executable, arguments)
 
 
-def _low_ram_env() -> dict[str, str]:
-    env = os.environ.copy()
-    env.setdefault("OMP_NUM_THREADS", "1")
-    env.setdefault("MKL_NUM_THREADS", "1")
-    env.setdefault("OPENBLAS_NUM_THREADS", "1")
-    env.setdefault("NUMEXPR_NUM_THREADS", "1")
-    env.setdefault("ORT_NUM_THREADS", "1")
-    env.setdefault("TOKENIZERS_PARALLELISM", "false")
-    return env
-
-
 def _run_step(label: str, arguments: list[str]) -> int:
     logger.info("Starting step: %s | cmd=%s", label, " ".join(arguments))
-    completed = subprocess.run(arguments, env=_low_ram_env(), check=False)
+    completed = subprocess.run(arguments, env=os.environ.copy(), check=False)
     if completed.returncode != 0:
         logger.error("Step failed: %s | exit_code=%s", label, completed.returncode)
     else:
@@ -102,34 +91,46 @@ def _run_step(label: str, arguments: list[str]) -> int:
 
 
 def exec_cron(embed: bool) -> None:
-    """One-shot ingestion for Render Cron Jobs with process isolation.
+    """One-shot ingestion for Render Cron Jobs with failure isolation.
 
-    Critical: crawl + ONNX embedding in the *same* process OOMs 512Mi dynos
-    (ingest alone used most of the heap; loading BGE then fails). Run:
+    Pipeline:
+      1. crawl + housekeeping (+ pulse alerts) as process A
+      2. incremental embeddings as process B (Gemini HTTP — no ONNX)
 
-    1. crawl/housekeeping as process A (exits → OS reclaims memory)
-    2. embed as process B (fresh heap for the model)
-
-    Jobs stay fully searchable via FTS if embeds fail or partial.
+    Ingestion success is independent of embedding success. Jobs remain
+    searchable via PostgreSQL FTS if embeds fail or are partial. The cron
+    exits 0 after a successful ingest so Render does not mark the whole
+    job index refresh as failed when only embeddings error (e.g. quota).
     """
     crawl_code = _run_step(
         "ingest",
         [sys.executable, "-m", "app.scheduler", "--once", "--ingest-only"],
     )
     if crawl_code != 0:
+        logger.error("INGESTION STATUS = FAILED | exit_code=%s", crawl_code)
         sys.exit(crawl_code)
 
+    logger.info("INGESTION STATUS = SUCCESS")
+
     if not embed:
+        logger.info("EMBEDDING STATUS = SKIPPED")
         sys.exit(0)
 
     embed_code = _run_step(
         "embed",
         [sys.executable, "-m", "app.ingest", "embed"],
     )
-    # Non-zero embed should not hide successful crawl for monitoring, but
-    # we still fail the cron so Render re-tries / alerts. FTS works either way.
     if embed_code != 0:
-        sys.exit(embed_code)
+        # Soft-fail: index is already fresh; next cron resumes embed backlog.
+        logger.error(
+            "EMBEDDING STATUS = FAILED | exit_code=%s | "
+            "ingest already succeeded — jobs searchable via FTS; "
+            "next run resumes incremental embeddings",
+            embed_code,
+        )
+        sys.exit(0)
+
+    logger.info("EMBEDDING STATUS = SUCCESS")
     sys.exit(0)
 
 

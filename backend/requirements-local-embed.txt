@@ -1,0 +1,4 @@
+# Optional local BGE embeddings (high-RAM hosts only).
+# Do NOT install on Render free/starter (512Mi) — model load OOMs.
+-r requirements.txt
+fastembed>=0.4.0
