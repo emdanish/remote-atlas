@@ -11,6 +11,7 @@ from app.pipeline.freshness import freshness_cutoff
 from app.search.embeddings import embed_texts
 from app.search.fts import search_jobs
 from app.search.intent import parse_intent
+from app.pipeline.seniority import seniority_query
 
 
 def reciprocal_rank_fusion(
@@ -37,6 +38,7 @@ async def hybrid_search(
     pakistan_friendly: bool = False,
     skills: Optional[list[str]] = None,
     career_stage: Optional[str] = None,
+    junior_eligible: bool = False,
     source: Optional[str] = None,
     sort: Optional[str] = None,
     page: int = 1,
@@ -62,6 +64,7 @@ async def hybrid_search(
             pakistan_friendly=pakistan_friendly,
             skills=skills,
             career_stage=career_stage,
+            junior_eligible=junior_eligible,
             source=source,
             sort=mode,
             page=page,
@@ -93,6 +96,7 @@ async def hybrid_search(
         pakistan_friendly=pakistan_friendly,
         skills=skills,
         career_stage=career_stage,
+        junior_eligible=junior_eligible,
         source=source,
         sort="relevance",
         page=1,
@@ -112,6 +116,7 @@ async def hybrid_search(
             pakistan_friendly=pakistan_friendly,
             skills=skills,
             career_stage=career_stage,
+            junior_eligible=junior_eligible,
             source=source,
             sort="newest",
             page=page,
@@ -157,12 +162,14 @@ async def hybrid_search(
     if employment_type:
         filters.append("employment_type ILIKE :employment_type")
         params["employment_type"] = f"%{employment_type}%"
-    if career_stage:
-        stage = career_stage.lower()
-        if stage in {"fresh", "fresh_graduate", "new_grad", "entry"}:
-            stage = "junior"
+    use_eligible, exact_stage = seniority_query(
+        career_stage, junior_eligible=junior_eligible
+    )
+    if use_eligible:
+        filters.append("junior_eligible = true")
+    elif exact_stage:
         filters.append("career_stage = :career_stage")
-        params["career_stage"] = stage
+        params["career_stage"] = exact_stage
     if source:
         filters.append("source = :source")
         params["source"] = source.lower()
@@ -216,6 +223,7 @@ async def hybrid_search(
             pakistan_friendly=pakistan_friendly,
             skills=skills,
             career_stage=career_stage,
+            junior_eligible=junior_eligible,
             source=source,
             sort="relevance",
             page=page,

@@ -1,7 +1,9 @@
 import { apiFetch } from "./client";
 import type {
   ApplicationStatus,
+  ApplyKit,
   FitBrief,
+  MatchResponse,
   Notification,
   OnboardingStatus,
   ResumeParseResponse,
@@ -77,9 +79,18 @@ export async function getFitBrief(jobId: number): Promise<FitBrief> {
   return apiFetch<FitBrief>(`/jobs/${jobId}/fit-brief`, { cache: "no-store" });
 }
 
+export async function getApplyKit(jobId: number): Promise<ApplyKit> {
+  return apiFetch<ApplyKit>(`/jobs/${jobId}/apply-kit`, { cache: "no-store" });
+}
+
+export async function getHuntPlan(): Promise<MatchResponse> {
+  return apiFetch<MatchResponse>("/hunt-plan", { cache: "no-store" });
+}
+
 export async function completeOnboarding(body: {
   skipped?: boolean;
   seed_skills?: string[];
+  experience_level?: string;
 }): Promise<OnboardingStatus> {
   return apiFetch<OnboardingStatus>("/onboarding/complete", {
     method: "POST",

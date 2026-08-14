@@ -17,7 +17,7 @@ class IntentHints:
 
 _STAGE_MAP = (
     (("internship", "intern", "trainee", "apprentice"), "internship"),
-    (("junior", "entry level", "entry-level", "new grad", "newgrad", "fresh graduate", "fresher", "associate"), "junior"),
+    (("new grad", "newgrad", "fresh graduate", "junior", "entry level", "entry-level", "fresher"), "junior"),
     (("mid-level", "mid level", "intermediate"), "mid"),
     (("senior", "staff ", "principal", "lead "), "senior"),
 )

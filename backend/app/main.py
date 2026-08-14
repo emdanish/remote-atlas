@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.routes import api_router
 from app.config import get_settings
+from app.security.origin import cookie_mutation_allowed
 
 
 @asynccontextmanager
@@ -40,8 +41,13 @@ async def security_middleware(request: Request, call_next):
     )
     origin = (request.headers.get("origin") or "").rstrip("/")
     allowed = {value.rstrip("/") for value in settings.cors_origin_list}
-    if unsafe and cookie_auth and origin and origin not in allowed:
-        return JSONResponse(status_code=403, content={"detail": "Cross-origin request rejected"})
+    if unsafe and cookie_auth:
+        if not cookie_mutation_allowed(
+            origin=origin,
+            referer=request.headers.get("referer"),
+            allowed=allowed,
+        ):
+            return JSONResponse(status_code=403, content={"detail": "Cross-origin request rejected"})
 
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"

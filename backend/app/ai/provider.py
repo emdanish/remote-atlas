@@ -1,8 +1,9 @@
 """AI chat providers with ordered key/provider fallback.
 
-Order: Gemini key 1 → Gemini key 2 → DeepSeek → Perplexity.
+Order: DeepSeek → Gemini key 1 → Gemini key 2 → Perplexity.
 
-Any single quota/auth/network failure must continue to the next option.
+Embeddings stay Gemini HTTP 768-d. Any single quota/auth/network failure
+must continue to the next option.
 """
 
 from __future__ import annotations
@@ -62,10 +63,10 @@ async def chat_completion(
     temperature: float = 0.2,
     max_tokens: int = 1024,
 ) -> str:
-    """
-    Secure server-side chat with provider fallback.
-    Order: Gemini key1 → Gemini key2 → DeepSeek → Perplexity.
-    API keys never leave the backend process.
+    """Secure server-side chat with provider fallback.
+
+    Order: DeepSeek → Gemini key1 → Gemini key2 → Perplexity.
+    Embeddings stay on Gemini. API keys never leave the backend process.
     """
     settings = get_settings()
     errors: list[str] = []
@@ -73,6 +74,25 @@ async def chat_completion(
     gemini_keys = settings.gemini_keys
     if not gemini_keys and not settings.deepseek_api_key and not settings.perplexity_api_key:
         raise AIProviderError("No API keys configured for chat providers")
+
+    # DeepSeek first so Gemini embed quota is not starved by resume chat.
+    if settings.deepseek_api_key:
+        try:
+            text = await _openai_compatible_chat(
+                api_key=settings.deepseek_api_key,
+                base_url="https://api.deepseek.com",
+                model="deepseek-chat",
+                system=system,
+                user=user,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+            logger.info("chat_completion succeeded via deepseek")
+            return text
+        except Exception as exc:  # noqa: BLE001
+            msg = f"deepseek: {exc}"
+            logger.warning("AI fallback — %s", msg)
+            errors.append(msg)
 
     for idx, key in enumerate(gemini_keys, start=1):
         last_for_key: Exception | None = None
@@ -92,24 +112,6 @@ async def chat_completion(
         if last_for_key is not None and not _is_auth_failure(last_for_key):
             # Key was usable but models failed (rate limit etc.) — try next key
             continue
-
-    if settings.deepseek_api_key:
-        try:
-            text = await _openai_compatible_chat(
-                api_key=settings.deepseek_api_key,
-                base_url="https://api.deepseek.com",
-                model="deepseek-chat",
-                system=system,
-                user=user,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
-            logger.info("chat_completion succeeded via deepseek")
-            return text
-        except Exception as exc:  # noqa: BLE001
-            msg = f"deepseek: {exc}"
-            logger.warning("AI fallback — %s", msg)
-            errors.append(msg)
 
     if settings.perplexity_api_key:
         try:

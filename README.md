@@ -39,6 +39,9 @@ App: <http://localhost:3000>
 Only public URLs belong in `frontend/.env.local`. Never put API keys or database
 credentials in a `NEXT_PUBLIC_*` variable.
 
+Junior-eligible search, assist-apply policy, Himalayas link-back, and resume
+storage caveats: [docs/junior-hunt.md](docs/junior-hunt.md).
+
 ## Environment variables
 
 The full backend template is in `backend/.env.example`. Important production

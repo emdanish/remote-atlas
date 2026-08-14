@@ -118,6 +118,13 @@ def looks_like_software_role(title: str, description: str | None) -> bool:
     )
     if any(value in title_lower for value in explicit):
         return True
+    # Engineering internships must not be dropped for lacking SWE keywords in the title.
+    if any(w in title_lower for w in ("intern", "internship", "apprentice", "trainee")):
+        if any(
+            w in title_lower
+            for w in ("engineer", "engineering", "software", "developer", "sre", "qa")
+        ):
+            return True
     blob = f"{title}\n{(description or '')[:5000]}".lower()
     software_signals = (
         "software development",

@@ -23,8 +23,11 @@ export type Job = {
   location_raw?: string | null;
   workplace_type: string;
   employment_type?: string | null;
-  career_stage: string;
-  skills: string[];
+    career_stage: string;
+    years_required_min?: number | null;
+    junior_eligible?: boolean;
+    seniority_signals?: Record<string, unknown> | null;
+    skills: string[];
   tech_tags: string[];
   posted_at?: string | null;
   first_seen_at: string;
@@ -88,21 +91,60 @@ export type User = {
 };
 
 export type TokenResponse = {
-  access_token: string;
-  token_type: string;
+  ok?: boolean;
+  token_type?: string;
 };
 
-export type ApplicationStatus = "saved" | "applied" | "interview" | "offer" | "rejected";
+export type ApplicationStatus =
+  | "saved"
+  | "applied"
+  | "interview"
+  | "offer"
+  | "rejected"
+  | "ghosted";
 
 export type SavedJob = {
   id: number;
-  job_id: number;
+  job_id?: number | null;
   notes?: string | null;
   status: ApplicationStatus;
   created_at?: string;
   job_title?: string | null;
   company_name?: string | null;
   apply_url?: string | null;
+  applied_at?: string | null;
+  follow_up_on?: string | null;
+  last_touch_at?: string | null;
+  checklist?: Record<string, boolean> | null;
+  listing_gone?: boolean;
+};
+
+export type ApplyKit = {
+  disclaimer: string;
+  job_id: number;
+  title: string;
+  company_name: string;
+  apply_url?: string | null;
+  field_card: Record<string, string>;
+  short_answers: Array<{ prompt: string; answer: string }>;
+  cover_note: string;
+  ats_estimate: {
+    host: string;
+    minutes_low: number;
+    minutes_high: number;
+    note: string;
+  };
+  skill_gaps: string[];
+  skill_path: {
+    skill: string;
+    label?: string;
+    days?: string[];
+    urls?: string[];
+  };
+  years_required_min?: number | null;
+  junior_eligible?: boolean;
+  skip_reason?: string | null;
+  checklist: Record<string, boolean>;
 };
 
 export type Notification = {
@@ -173,6 +215,7 @@ export type JobSearchParams = {
   pakistan_friendly?: boolean;
   skills?: string;
   career_stage?: string;
+  junior_eligible?: boolean;
   source?: string;
   country?: string;
   company?: string;

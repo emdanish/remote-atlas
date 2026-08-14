@@ -70,12 +70,22 @@ ALL_SOURCES = {
 }
 
 
+async def _junior_hirer_names() -> set[str]:
+    path = Path(__file__).resolve().parents[1] / "data" / "junior_hirers.yaml"
+    if not path.exists():
+        return set()
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    names = data.get("names") or []
+    return {str(n).strip().lower() for n in names if str(n).strip()}
+
+
 async def sync_companies_simple(session) -> list[Company]:
     """Batch upsert company registry from YAML (no N+1 selects)."""
     settings = get_settings()
     path = Path(settings.companies_path)
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     rows = data.get("companies") or []
+    junior_names = await _junior_hirer_names()
     if not rows:
         result = await session.execute(select(Company).where(Company.is_enabled.is_(True)))
         return list(result.scalars().all())
@@ -100,6 +110,8 @@ async def sync_companies_simple(session) -> list[Company]:
             ),
             "region_focus": (row.get("region_focus") or "global")[:32],
             "is_enabled": bool(row.get("is_enabled", True)),
+            "hires_juniors": bool(row.get("hires_juniors", False))
+            or (row.get("name") or slug).strip().lower() in junior_names,
         }
         for (ats, slug), row in by_key.items()
     ]
@@ -117,6 +129,7 @@ async def sync_companies_simple(session) -> list[Company]:
                 "career_page_url": stmt.excluded.career_page_url,
                 "region_focus": stmt.excluded.region_focus,
                 "is_enabled": stmt.excluded.is_enabled,
+                "hires_juniors": stmt.excluded.hires_juniors,
                 "updated_at": now,
             },
         )
@@ -147,7 +160,7 @@ async def record_run(
     await session.commit()
 
 
-async def run_ingest(sources: list[str] | None = None, embed: bool = True) -> None:
+async def run_ingest(sources: list[str] | None = None, embed: bool = True) -> int:
     wanted = set(sources) if sources else set(ALL_SOURCES)
     t0 = datetime.now(timezone.utc)
     totals = {
@@ -357,7 +370,25 @@ async def run_ingest(sources: list[str] | None = None, embed: bool = True) -> No
                           posted_at >= NOW() - make_interval(days => :days)
                           OR (posted_at IS NULL AND first_seen_at >= NOW() - make_interval(days => :days))
                         )
-                      ) AS fresh_jobs
+                      ) AS fresh_jobs,
+                      count(*) FILTER (
+                        WHERE is_active AND junior_eligible AND (
+                          posted_at >= NOW() - make_interval(days => :days)
+                          OR (posted_at IS NULL AND first_seen_at >= NOW() - make_interval(days => :days))
+                        )
+                      ) AS junior_eligible_jobs,
+                      count(*) FILTER (
+                        WHERE is_active AND career_stage = 'internship' AND (
+                          posted_at >= NOW() - make_interval(days => :days)
+                          OR (posted_at IS NULL AND first_seen_at >= NOW() - make_interval(days => :days))
+                        )
+                      ) AS internship_jobs,
+                      count(*) FILTER (
+                        WHERE is_active AND career_stage = 'new_grad' AND (
+                          posted_at >= NOW() - make_interval(days => :days)
+                          OR (posted_at IS NULL AND first_seen_at >= NOW() - make_interval(days => :days))
+                        )
+                      ) AS new_grad_jobs
                     FROM jobs
                     """
                 ),
@@ -366,9 +397,18 @@ async def run_ingest(sources: list[str] | None = None, embed: bool = True) -> No
         ).mappings().one()
 
         elapsed = (datetime.now(timezone.utc) - t0).total_seconds()
+        if totals["sources_started"] > 0 and totals["sources_ok"] == 0:
+            logger.error(
+                "INGESTION STATUS = FAILED | duration=%.1fs | sources_ok=0/%s | fetched=%s",
+                elapsed,
+                totals["sources_started"],
+                totals["fetched"],
+            )
+            return 1
         logger.info(
             "INGESTION STATUS = SUCCESS | duration=%.1fs | sources_ok=%s/%s | fetched=%s | "
-            "upserted=%s | embedded=%s | active_jobs=%s | fresh_jobs=%s | freshness_days=%s",
+            "upserted=%s | embedded=%s | active_jobs=%s | fresh_jobs=%s | "
+            "junior_eligible=%s | internships=%s | new_grad=%s | freshness_days=%s",
             elapsed,
             totals["sources_ok"],
             totals["sources_started"],
@@ -377,10 +417,14 @@ async def run_ingest(sources: list[str] | None = None, embed: bool = True) -> No
             embed_stats.processed,
             inventory["active_jobs"],
             inventory["fresh_jobs"],
+            inventory["junior_eligible_jobs"],
+            inventory["internship_jobs"],
+            inventory["new_grad_jobs"],
             get_settings().freshness_days,
         )
         if embed:
             logger.info("EMBEDDING STATUS = %s", embed_stats.status)
+        return 0
 
 
 def main() -> None:
@@ -412,7 +456,7 @@ def main() -> None:
     if args.command == "run":
         # Default: no embed in same process (memory). Use --embed only for local convenience.
         do_embed = bool(args.embed) and not bool(args.no_embed)
-        asyncio.run(run_ingest(sources=args.sources, embed=do_embed))
+        raise SystemExit(asyncio.run(run_ingest(sources=args.sources, embed=do_embed)))
     elif args.command == "embed":
 
         async def _embed() -> int:

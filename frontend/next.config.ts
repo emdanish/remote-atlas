@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
     // Middleware alone is insufficient if matchers are invalid; rewrites
     // map reliably on Vercel before the filesystem/router 404s.
     return {
-      beforeFiles: [
+      afterFiles: [
         {
           source: "/remote-:skill-jobs",
           destination: "/seo/skills/:skill",

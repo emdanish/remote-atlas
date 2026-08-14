@@ -1,0 +1,98 @@
+{
+  "kubernetes": {
+    "label": "Kubernetes",
+    "days": [
+      "Day 1: Read the Kubernetes overview on roadmap.sh",
+      "Day 2: kubectl cheat sheet — pods, deployments, services",
+      "Day 3: Deploy a sample app locally with minikube or kind",
+      "Day 4: ConfigMaps, Secrets, and rolling updates",
+      "Day 5: Read one real job's k8s requirements and map gaps",
+      "Day 6: Troubleshoot a failing pod (logs, describe, events)",
+      "Day 7: Write 5 resume bullets from what you actually ran"
+    ],
+    "urls": [
+      "https://roadmap.sh/kubernetes",
+      "https://www.freecodecamp.org/news/learn-kubernetes-in-under-3-hours-a-detailed-guide-to-orchestrating-containers-114ff420e882/"
+    ]
+  },
+  "aws": {
+    "label": "AWS",
+    "days": [
+      "Day 1: AWS cloud practitioner map on roadmap.sh",
+      "Day 2: IAM, S3, and EC2 core mental model",
+      "Day 3: Deploy a static site or API to a free-tier service",
+      "Day 4: CloudWatch logs and basic cost awareness",
+      "Day 5: Read the JD's AWS list and mark must-have vs nice-to-have",
+      "Day 6: Terraform or console: one VPC sketch on paper",
+      "Day 7: Document what you deployed — no invented production claims"
+    ],
+    "urls": [
+      "https://roadmap.sh/aws",
+      "https://www.freecodecamp.org/news/aws-certified-cloud-practitioner-training-2019-free-video-course/"
+    ]
+  },
+  "react": {
+    "label": "React",
+    "days": [
+      "Day 1: React roadmap — components, props, state",
+      "Day 2: Build a list + form with hooks",
+      "Day 3: Fetch an API and handle loading/error",
+      "Day 4: React Router or Next.js app router basics",
+      "Day 5: Accessibility: labels, keyboard, one lint pass",
+      "Day 6: Match JD keywords to what your repo actually uses",
+      "Day 7: Ship a small public demo and link it"
+    ],
+    "urls": [
+      "https://roadmap.sh/react",
+      "https://www.freecodecamp.org/learn/front-end-development-libraries/"
+    ]
+  },
+  "python": {
+    "label": "Python",
+    "days": [
+      "Day 1: Python roadmap — syntax, venv, packaging",
+      "Day 2: Write tests for a small function (pytest)",
+      "Day 3: FastAPI or Django tutorial hello-world",
+      "Day 4: SQL + one ORM query you can explain",
+      "Day 5: Read the JD and list libraries you have vs lack",
+      "Day 6: Type hints and a linter on your project",
+      "Day 7: Honest GitHub README of what you built"
+    ],
+    "urls": [
+      "https://roadmap.sh/python",
+      "https://www.freecodecamp.org/learn/scientific-computing-with-python/"
+    ]
+  },
+  "sql": {
+    "label": "SQL",
+    "days": [
+      "Day 1: SELECT, WHERE, JOIN on a sample dataset",
+      "Day 2: GROUP BY and window functions intro",
+      "Day 3: Indexes and EXPLAIN at a glance",
+      "Day 4: Model the JD's data in 3 tables",
+      "Day 5: Write 5 queries you could whiteboard",
+      "Day 6: PostgreSQL docs: constraints and transactions",
+      "Day 7: Put queries in a gist — no fake production scale"
+    ],
+    "urls": [
+      "https://roadmap.sh/sql",
+      "https://www.freecodecamp.org/news/sql-and-databases-full-course/"
+    ]
+  },
+  "default": {
+    "label": "Core software skills",
+    "days": [
+      "Day 1: Pick one JD skill you lack and read its roadmap.sh page",
+      "Day 2: Follow a freeCodeCamp intro for that skill (2 hours)",
+      "Day 3: Build the smallest demo that uses it",
+      "Day 4: Write what you did in plain language (interview answer)",
+      "Day 5: Re-read the JD — skip if it still wants 4+ years of that skill",
+      "Day 6: Apply to 1–2 junior-eligible roles that match what you have",
+      "Day 7: Follow up on anything you applied to 7 days ago"
+    ],
+    "urls": [
+      "https://roadmap.sh/backend",
+      "https://www.freecodecamp.org/learn/"
+    ]
+  }
+}

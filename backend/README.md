@@ -29,5 +29,13 @@ python -m app.deploy cron --embed
 Logs distinguish `INGESTION STATUS` from `EMBEDDING STATUS`. Embedding failure
 after a successful ingest does not fail the cron exit code.
 
-Production deployments must use a strong `JWT_SECRET`, HTTPS with
+Production deployments must use a strong `JWT_SECRET` (≥32 chars, not the
+placeholder). On Render, a weak secret **refuses to start**. Use HTTPS with
 `AUTH_COOKIE_SECURE=true`, and an exact frontend origin in `CORS_ORIGINS`.
+Sessions are **HttpOnly cookies only** — the API does not return JWTs to JavaScript.
+
+Resume binaries on disk are ephemeral on Render. Extracted text in Postgres is
+durable; see [docs/junior-hunt.md](../docs/junior-hunt.md).
+
+Himalayas listings must keep official apply URLs (link-back). Do not ingest
+unlicensed community job JSON as first-class catalog rows.

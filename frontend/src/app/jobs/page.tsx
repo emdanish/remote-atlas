@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   parseAsBoolean,
@@ -72,6 +72,24 @@ function JobsSearchInner() {
     shallow: true,
   });
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const appliedJuniorDefault = useRef(false);
+
+  useEffect(() => {
+    if (appliedJuniorDefault.current || !user?.profile) return;
+    const level = (user.profile.experience_level || "").toLowerCase();
+    if (!["internship", "new_grad", "junior", "entry"].includes(level)) {
+      appliedJuniorDefault.current = true;
+      return;
+    }
+    const urlHasStage =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).has("career_stage");
+    appliedJuniorDefault.current = true;
+    if (urlHasStage) return;
+    void setParams({
+      career_stage: level === "internship" ? "internship" : "junior",
+    });
+  }, [user, setParams]);
 
   const [draft, setDraft] = useState<SearchFilterState>({
     q: params.q,
@@ -224,7 +242,10 @@ function JobsSearchInner() {
     if (params.career_stage) {
       chips.push({
         key: "stage",
-        label: `Experience: ${titleCase(params.career_stage)}`,
+        label:
+          params.career_stage === "junior"
+            ? "Experience: junior-eligible"
+            : `Experience: ${titleCase(params.career_stage)}`,
         clear: () => void setParams({ career_stage: null, page: null }),
       });
     }
@@ -313,7 +334,13 @@ function JobsSearchInner() {
     if (params.city) bits.push(`city “${params.city}”`);
     if (params.country) bits.push(`country “${params.country}”`);
     if (params.company) bits.push(`company “${params.company}”`);
-    if (params.career_stage) bits.push(`${titleCase(params.career_stage)} level`);
+    if (params.career_stage) {
+      bits.push(
+        params.career_stage === "junior"
+          ? "junior-eligible (intern, new grad, junior, or seniority not stated)"
+          : `${titleCase(params.career_stage)} level`,
+      );
+    }
     if (params.employment_type) bits.push(titleCase(params.employment_type));
     if (params.source) bits.push(`source ${params.source}`);
     if (params.pakistan_friendly) bits.push("Pakistan-friendly remote");
@@ -347,6 +374,17 @@ function JobsSearchInner() {
     (params.posted_within && params.posted_within !== DEFAULT_FILTERS.posted_within) ||
     (params.sort && params.sort !== DEFAULT_FILTERS.sort) ||
     params.workplace === "";
+
+  const pulseHref = useMemo(() => {
+    const qs = new URLSearchParams();
+    if (params.q) qs.set("q", params.q);
+    if (params.skills) qs.set("skills", params.skills);
+    if (params.workplace) qs.set("workplace", params.workplace);
+    if (params.career_stage) qs.set("career_stage", params.career_stage);
+    if (params.pakistan_friendly) qs.set("pakistan_friendly", "1");
+    const s = qs.toString();
+    return s ? `/alerts?${s}` : "/alerts";
+  }, [params]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
@@ -434,7 +472,7 @@ function JobsSearchInner() {
                     size="sm"
                     variant="ghost"
                     type="button"
-                    href={`/alerts?q=${encodeURIComponent(params.q || "")}&skills=${encodeURIComponent(params.skills || "")}`}
+                    href={pulseHref}
                   >
                     Save as Pulse
                   </Button>
@@ -506,9 +544,18 @@ function JobsSearchInner() {
           {!isLoading && data && data.results.length === 0 ? (
             <EmptyState
               title="Nothing matched those filters"
-              description="Try removing a technology chip, clearing city/country, or opening the date window to 30 days."
+              description={
+                params.career_stage === "junior" || params.career_stage === "internship"
+                  ? "Remote intern and junior roles are scarce. Junior-eligible includes internships, new-grad, junior titles, and unspecified IC roles that do not ask for 3+ years — not every Software Engineer listing. Clear experience, include seniority-not-stated, or widen the date window."
+                  : "Try removing a technology chip, clearing city/country, or opening the date window to 30 days. A tight experience filter can hide unlabeled roles."
+              }
               actions={[
-                { label: "Reset to remote · 14 days", onClick: clear, variant: "secondary" },
+                {
+                  label: "Clear experience filter",
+                  onClick: () => void setParams({ career_stage: null, page: null }),
+                  variant: "secondary",
+                },
+                { label: "Reset to remote · 14 days", onClick: clear, variant: "ghost" },
               ]}
             />
           ) : null}

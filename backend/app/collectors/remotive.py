@@ -34,6 +34,9 @@ class RemotiveCollector(BaseCollector):
             location = item.get("candidate_required_location") or "Remote"
             tags = item.get("tags") or []
             enriched = enrich_job_fields(title, text, location, existing_tags=tags)
+            job_type = item.get("job_type")
+            job_type_s = str(job_type).strip() if job_type else None
+            source_level = job_type_s if job_type_s and "intern" in job_type_s.lower() else None
             results.append(
                 NormalizedJob(
                     source=self.source,
@@ -47,8 +50,11 @@ class RemotiveCollector(BaseCollector):
                     description_html=description if description and "<" in str(description) else None,
                     location_raw=location,
                     workplace_type="remote",
-                    employment_type=item.get("job_type"),
-                    career_stage=infer_career_stage(title, text),
+                    employment_type=job_type_s,
+                    career_stage=infer_career_stage(
+                        title, text, source_level=source_level, employment_type=job_type_s
+                    ),
+                    source_level=source_level,
                     skills=enriched["skills"],
                     tech_tags=enriched["tech_tags"],
                     posted_at=parse_datetime(item.get("publication_date")),

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -72,7 +73,7 @@ async def register(
     db.add(
         Profile(
             user_id=user.id,
-            experience_level="junior",
+            experience_level=body.experience_level or "junior",
             remote_preference="remote",
             pakistan_friendly=True,
             skills=[],
@@ -81,10 +82,14 @@ async def register(
             cities=[],
         )
     )
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="Email already registered") from None
     token = create_access_token(user.id, extra={"email": user.email})
     _set_session_cookie(response, token)
-    return TokenResponse(access_token=token)
+    return TokenResponse(ok=True)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -101,7 +106,7 @@ async def login(
         raise HTTPException(status_code=401, detail="Invalid email or password")
     token = create_access_token(user.id, extra={"email": user.email})
     _set_session_cookie(response, token)
-    return TokenResponse(access_token=token)
+    return TokenResponse(ok=True)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

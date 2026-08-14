@@ -69,6 +69,7 @@ companies:
   career_page_url: https://jobs.ashbyhq.com/buffer
   region_focus: global
   is_enabled: true
+  hires_juniors: true
 - name: Cartesia
   website: https://cartesia.com
   ats_type: ashby
@@ -1161,6 +1162,7 @@ companies:
   career_page_url: https://boards.greenhouse.io/elastic
   region_focus: global
   is_enabled: true
+  hires_juniors: true
 - name: Epicgames
   website: https://epicgames.com
   ats_type: greenhouse
@@ -1259,6 +1261,7 @@ companies:
   career_page_url: https://boards.greenhouse.io/gitlab
   region_focus: global
   is_enabled: true
+  hires_juniors: true
 - name: Glean
   website: https://gleanwork.com
   ats_type: greenhouse
@@ -1287,6 +1290,7 @@ companies:
   career_page_url: https://boards.greenhouse.io/grafanalabs
   region_focus: global
   is_enabled: true
+  hires_juniors: true
 - name: Greenhouse
   website: https://greenhouse.com
   ats_type: greenhouse
@@ -1616,6 +1620,7 @@ companies:
   career_page_url: https://boards.greenhouse.io/mozilla
   region_focus: global
   is_enabled: true
+  hires_juniors: true
 - name: N26
   website: https://n26.com
   ats_type: greenhouse
@@ -2400,6 +2405,7 @@ companies:
   ats_slug: canonical
   region_focus: global
   is_enabled: true
+  hires_juniors: true
 - name: Liquid Development
   website: https://liquiddevelopment.com/
   career_page_url: https://apply.workable.com/liquid-development/

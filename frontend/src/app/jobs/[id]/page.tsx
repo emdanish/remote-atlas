@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronRight, MapPin } from "lucide-react";
 import { FitBriefPanel } from "@/components/jobs/FitBriefPanel";
+import { ApplyKitPanel } from "@/components/jobs/ApplyKitPanel";
 import { TailorResumePanel } from "@/components/jobs/TailorResumePanel";
 import { JobDescription } from "@/components/jobs/JobDescription";
 import { Badge } from "@/components/ui/Badge";
@@ -24,6 +25,7 @@ import { companySeoHref, skillSeoHref } from "@/lib/seoTaxonomy";
 import {
   formatRelativeDate,
   officialApplyUrl,
+  seniorityBadgeLabel,
   sourceKindLabel,
   titleCase,
   uniqueLabels,
@@ -87,6 +89,15 @@ export default async function JobDetailPage({ params }: Props) {
       skills: skills || undefined,
       page_size: 6,
       hybrid: true,
+      junior_eligible: job.junior_eligible ? true : undefined,
+      career_stage:
+        job.career_stage === "internship"
+          ? "internship"
+          : job.career_stage === "new_grad"
+            ? "new_grad"
+            : job.junior_eligible
+              ? "junior"
+              : undefined,
     });
     related = res.results.filter((j) => j.id !== job.id).slice(0, 4);
   } catch {
@@ -155,8 +166,9 @@ export default async function JobDetailPage({ params }: Props) {
                 </Badge>
               ) : null}
               <Badge>{titleCase(job.workplace_type)}</Badge>
-              {job.career_stage !== "unknown" ? (
-                <Badge>{titleCase(job.career_stage)}</Badge>
+              {seniorityBadgeLabel(job) ? <Badge>{seniorityBadgeLabel(job)}</Badge> : null}
+              {job.years_required_min != null ? (
+                <Badge>{job.years_required_min}+ years listed</Badge>
               ) : null}
               {job.employment_type ? <Badge>{job.employment_type}</Badge> : null}
             </div>
@@ -212,6 +224,7 @@ export default async function JobDetailPage({ params }: Props) {
           </div>
 
           <div className="mt-12 space-y-8 border-t border-line pt-10">
+            <ApplyKitPanel jobId={job.id} />
             <TailorResumePanel jobId={job.id} />
             <FitBriefPanel jobId={job.id} />
           </div>
@@ -223,7 +236,7 @@ export default async function JobDetailPage({ params }: Props) {
               Official application
             </p>
             <p className="mt-2 text-sm leading-6 text-muted">
-              Apply on the company&apos;s own system. Remote Atlas does not host applications.
+              Apply on the company&apos;s own system. We never submit applications for you.
             </p>
             <div className="mt-4 flex flex-col gap-2">
               {applyUrl && indexable ? (

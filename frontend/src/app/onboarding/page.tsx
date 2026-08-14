@@ -11,13 +11,14 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import {
   completeOnboarding,
+  createSavedSearch,
   getRecommendations,
   parseResume,
   type ResumeParseResponse,
 } from "@/lib/api";
 import { formatApiError } from "@/lib/apiError";
 import { useRequireAuth } from "@/lib/auth";
-import { markOnboardingDoneLocal } from "@/lib/onboarding";
+import { markOnboardingDoneLocal, storeSeedSkills } from "@/lib/onboarding";
 import { uniqueLabels } from "@/lib/utils";
 
 export default function OnboardingPage() {
@@ -27,6 +28,7 @@ export default function OnboardingPage() {
   const [parsed, setParsed] = useState<ResumeParseResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<"upload" | "matches">("upload");
+  const [huntStage, setHuntStage] = useState("junior");
 
   const recs = useQuery({
     queryKey: ["recommendations", user?.id, "onboarding"],
@@ -57,10 +59,25 @@ export default function OnboardingPage() {
   });
 
   async function finish(path: string, skipped = false) {
+    const seeds = parsed?.seed_skills || parsed?.technologies?.slice(0, 2);
+    if (seeds?.length) storeSeedSkills(seeds);
     try {
       await completeOnboarding({
         skipped,
-        seed_skills: parsed?.seed_skills || parsed?.technologies?.slice(0, 2),
+        seed_skills: seeds,
+        experience_level: huntStage,
+      });
+      await createSavedSearch({
+        name: "Junior-eligible remote",
+        query_params: {
+          workplace: "remote",
+          career_stage: huntStage === "internship" ? "internship" : "junior",
+          junior_eligible: huntStage !== "internship",
+          pakistan_friendly: true,
+          posted_within: 7,
+          skills: seeds?.join(", ") || undefined,
+        },
+        is_active: true,
       });
     } catch {
       /* non-blocking */
@@ -102,17 +119,41 @@ export default function OnboardingPage() {
 
       {step === "upload" ? (
         <div className="rounded-xl border border-line bg-elevated p-6 shadow-soft sm:p-8">
+          <fieldset className="mb-6 text-sm">
+            <legend className="mb-2 font-medium text-ink">First-job stage</legend>
+            <p className="mb-3 text-xs text-muted">
+              We use this for junior-eligible search. We do not silently treat unlabeled senior roles as junior.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {[
+                { value: "internship", label: "Internship" },
+                { value: "new_grad", label: "New graduate" },
+                { value: "junior", label: "Junior / first role" },
+              ].map((opt) => (
+                <label key={opt.value} className="inline-flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="hunt_stage"
+                    checked={huntStage === opt.value}
+                    onChange={() => setHuntStage(opt.value)}
+                    className="accent-accent"
+                  />
+                  {opt.label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <label className="flex cursor-pointer flex-col items-center gap-3 rounded-lg border border-dashed border-line bg-paper/80 px-4 py-10 text-center transition-colors hover:border-accent/40">
             <FileUp className="h-8 w-8 text-accent" aria-hidden />
             <span className="text-sm font-medium text-ink">
               {resumeMutation.isPending ? "Parsing resume…" : "Drop PDF or text, or click to upload"}
             </span>
             <span className="text-xs text-muted">
-              PDF, TXT, MD · max 2MB · multi-provider AI parse + skill lexicon backup
+              PDF, DOCX, TXT, MD · max 2MB · we extract text and rank roles — we never submit applications for you
             </span>
             <input
               type="file"
-              accept=".pdf,.txt,.md,application/pdf,text/plain"
+              accept=".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
               className="sr-only"
               disabled={resumeMutation.isPending}
               onChange={(e) => {

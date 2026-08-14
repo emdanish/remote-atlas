@@ -44,6 +44,7 @@ def _filters_from_query(params: dict[str, Any]) -> dict[str, Any]:
         "pakistan_friendly": bool(params.get("pakistan_friendly")),
         "skills": skill_list,
         "career_stage": params.get("career_stage") or None,
+        "junior_eligible": bool(params.get("junior_eligible")),
         "source": params.get("source") or None,
         "sort": "newest",
         "page": 1,

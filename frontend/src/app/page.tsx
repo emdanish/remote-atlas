@@ -171,6 +171,23 @@ export default async function LandingPage() {
               {stats?.freshness ?? 14}-day freshness window
             </li>
           </ul>
+          <p className="mt-6">
+            <Link
+              href="/jobs?career_stage=junior&workplace=remote"
+              className="text-sm font-semibold text-teal-300 underline-offset-4 hover:underline"
+            >
+              Entry-level and internships →
+            </Link>
+            <span className="mx-3 text-white/30" aria-hidden>
+              ·
+            </span>
+            <Link
+              href="/remote-internships"
+              className="text-sm font-semibold text-white/70 underline-offset-4 hover:text-white hover:underline"
+            >
+              Internships only
+            </Link>
+          </p>
         </div>
       </section>
 

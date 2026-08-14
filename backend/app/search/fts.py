@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.models import Job
 from app.pipeline.freshness import freshness_cutoff
+from app.pipeline.seniority import seniority_query
 
 
 def _base_fresh_query(days: int | None = None) -> Select:
@@ -75,6 +76,7 @@ async def search_jobs(
     pakistan_friendly: bool = False,
     skills: Optional[list[str]] = None,
     career_stage: Optional[str] = None,
+    junior_eligible: bool = False,
     source: Optional[str] = None,
     sort: Optional[str] = None,
     page: int = 1,
@@ -149,11 +151,13 @@ async def search_jobs(
     if employment_type:
         stmt = stmt.where(Job.employment_type.ilike(f"%{employment_type}%"))
 
-    if career_stage:
-        stage = career_stage.lower()
-        if stage in {"fresh", "fresh_graduate", "new_grad", "entry"}:
-            stage = "junior"
-        stmt = stmt.where(Job.career_stage == stage)
+    use_eligible, exact_stage = seniority_query(
+        career_stage, junior_eligible=junior_eligible
+    )
+    if use_eligible:
+        stmt = stmt.where(Job.junior_eligible.is_(True))
+    elif exact_stage:
+        stmt = stmt.where(Job.career_stage == exact_stage)
 
     if source:
         stmt = stmt.where(Job.source == source.lower())

@@ -19,14 +19,29 @@ logger = logging.getLogger("deploy")
 MIGRATION_LOCK_ID = 7_245_109_391
 
 
-def migrate() -> None:
-    """Serialize Alembic migrations when multiple Render services start together."""
+def assert_production_jwt() -> None:
+    """Fail closed on Render if JWT_SECRET is the placeholder or too short."""
     settings = get_settings()
-    if settings.jwt_secret.startswith("change-me"):
+    secret = (settings.jwt_secret or "").strip()
+    on_render = bool(os.environ.get("RENDER"))
+    weak = secret.startswith("change-me") or len(secret) < 32
+    if on_render and weak:
+        logger.error(
+            "JWT_SECRET is the default placeholder or shorter than 32 characters. "
+            "Refusing to start on Render."
+        )
+        sys.exit(1)
+    if weak:
         logger.warning(
             "JWT_SECRET still uses the insecure default placeholder. "
             "Set a long random value before serving real users."
         )
+
+
+def migrate() -> None:
+    """Serialize Alembic migrations when multiple Render services start together."""
+    settings = get_settings()
+    assert_production_jwt()
     engine = create_engine(settings.database_url_sync, poolclass=NullPool)
     try:
         with engine.connect() as connection:

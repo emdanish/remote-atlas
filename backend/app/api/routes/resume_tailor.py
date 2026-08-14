@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select, update
@@ -15,6 +15,7 @@ from sqlalchemy.orm import selectinload
 
 from app.auth.deps import get_current_user
 from app.db.session import AsyncSessionLocal, get_db
+from app.security import enforce_rate_limit
 from app.models import Job, ResumeTailoring, User, UserResume
 from app.resume.extract import ExtractError, extract_text
 from app.resume.pipeline import run_tailoring
@@ -202,9 +203,26 @@ async def start_tailor(
     job_id: int,
     body: TailorStartRequest,
     background: BackgroundTasks,
+    request: Request,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> TailorOut:
+    await enforce_rate_limit(
+        request, "tailor", limit=3, period_seconds=3600, identity=str(user.id)
+    )
+    inflight = (
+        await db.execute(
+            select(ResumeTailoring.id).where(
+                ResumeTailoring.user_id == user.id,
+                ResumeTailoring.status.in_(("pending", "running")),
+            )
+        )
+    ).scalar_one_or_none()
+    if inflight:
+        raise HTTPException(
+            status_code=429,
+            detail="A resume tailor is already running. Wait for it to finish.",
+        )
     job = (await db.execute(select(Job).where(Job.id == job_id))).scalar_one_or_none()
     if not job or not job.is_active:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -402,9 +420,13 @@ async def delete_tailoring(
 async def regenerate_tailoring(
     tailoring_id: int,
     background: BackgroundTasks,
+    request: Request,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> TailorOut:
+    await enforce_rate_limit(
+        request, "tailor", limit=3, period_seconds=3600, identity=str(user.id)
+    )
     old = (
         await db.execute(
             select(ResumeTailoring).where(

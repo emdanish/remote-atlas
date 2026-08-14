@@ -5,6 +5,7 @@ const PRIVATE_PREFIXES = [
   "/profile",
   "/saved",
   "/matches",
+  "/hunt",
   "/alerts",
   "/onboarding",
   "/login",
@@ -25,7 +26,8 @@ export function middleware(request: NextRequest) {
   const skillMatch = pathname.match(/^\/remote-([a-z0-9]+(?:-[a-z0-9]+)*)-jobs\/?$/i);
   if (skillMatch) {
     const skill = skillMatch[1].toLowerCase();
-    if (skill && skill !== "jobs") {
+    // Explicit catalogue landings live as app routes, not skill taxonomy.
+    if (skill && skill !== "jobs" && skill !== "junior") {
       const url = request.nextUrl.clone();
       url.pathname = `/seo/skills/${skill}`;
       return NextResponse.rewrite(url);
@@ -54,6 +56,7 @@ export const config = {
     "/profile/:path*",
     "/saved/:path*",
     "/matches/:path*",
+    "/hunt/:path*",
     "/alerts/:path*",
     "/onboarding/:path*",
     "/login",

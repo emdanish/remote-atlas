@@ -4,7 +4,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,19 +14,24 @@ from app.ai.provider import AIProviderError, chat_completion
 from app.auth.deps import get_current_user
 from app.config import get_settings
 from app.db.session import get_db
+from app.matching.apply_kit import build_apply_kit
 from app.matching.fit_brief import build_fit_brief
+from app.matching.followup import mark_applied
 from app.matching.scoring import (
     build_search_query,
     profile_onboarding_state,
     score_job_breakdown,
 )
-from app.models import Job, Notification, User
+from app.models import Job, Notification, SavedJob, User
 from app.pipeline.enrich import extract_skills
 from app.pipeline.freshness import is_fresh
+from app.pipeline.seniority import JUNIOR_PROFILE_LEVELS, exclude_for_junior_profile
 from app.pipeline.source_trust import source_kind, source_kind_label
 from app.schemas.auth import OnboardingOut
 from app.schemas.job import JobOut
+from app.search.fts import search_jobs
 from app.search.hybrid import hybrid_search
+from app.security import enforce_rate_limit
 
 router = APIRouter(tags=["phase3"])
 
@@ -61,6 +66,7 @@ class ResumeParseResponse(BaseModel):
 class OnboardingCompleteRequest(BaseModel):
     skipped: bool = False
     seed_skills: list[str] | None = None
+    experience_level: str | None = None
 
 
 class FitBriefResponse(BaseModel):
@@ -106,11 +112,15 @@ def _profile_context(profile) -> dict[str, Any]:
 
 @router.get("/recommendations", response_model=MatchResponse)
 async def recommendations(
+    request: Request,
     page: int = 1,
     page_size: int = 20,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> MatchResponse:
+    await enforce_rate_limit(
+        request, "recommendations", limit=40, period_seconds=3600, identity=str(user.id)
+    )
     settings = get_settings()
     result = await db.execute(
         select(User).options(selectinload(User.profile)).where(User.id == user.id)
@@ -142,6 +152,7 @@ async def recommendations(
         workplace = "onsite"
     elif ctx["remote_pref"] == "hybrid":
         workplace = "hybrid"
+    junior_mode = ctx["level"] in JUNIOR_PROFILE_LEVELS
 
     candidate_jobs: list[tuple[Job, float]] = []
     total = 0
@@ -165,6 +176,7 @@ async def recommendations(
                 pakistan_friendly=False,
                 skills=None,
                 career_stage=None,
+                junior_eligible=junior_mode,
                 sort="newest" if not query.strip() else "relevance",
                 page=1,
                 page_size=min(100, max(page_size * 5, 60)),
@@ -189,6 +201,8 @@ async def recommendations(
 
     reranked: list[tuple[Job, Any]] = []
     for job, hybrid_s in candidate_jobs:
+        if exclude_for_junior_profile(job, ctx["level"]):
+            continue
         bd = score_job_breakdown(
             job,
             skills=skills,
@@ -251,10 +265,14 @@ async def recommendations(
 @router.get("/jobs/{job_id}/fit-brief", response_model=FitBriefResponse)
 async def job_fit_brief(
     job_id: int,
+    request: Request,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> FitBriefResponse:
     """Atlas Fit Brief — explainable apply decision for this role."""
+    await enforce_rate_limit(
+        request, "fit-brief", limit=20, period_seconds=3600, identity=str(user.id)
+    )
     result = await db.execute(
         select(User).options(selectinload(User.profile)).where(User.id == user.id)
     )
@@ -284,6 +302,94 @@ async def job_fit_brief(
     return FitBriefResponse(**brief)
 
 
+@router.get("/jobs/{job_id}/apply-kit")
+async def job_apply_kit(
+    job_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    result = await db.execute(
+        select(User).options(selectinload(User.profile)).where(User.id == user.id)
+    )
+    user = result.scalar_one()
+    job = (
+        await db.execute(select(Job).where(Job.id == job_id, Job.is_active.is_(True)))
+    ).scalar_one_or_none()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return build_apply_kit(user, job)
+
+
+@router.get("/hunt-plan", response_model=MatchResponse)
+async def hunt_plan(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> MatchResponse:
+    """5–8 junior-eligible roles posted in the last 48 hours. Not a streak counter."""
+    settings = get_settings()
+    result = await db.execute(
+        select(User).options(selectinload(User.profile)).where(User.id == user.id)
+    )
+    user = result.scalar_one()
+    ctx = _profile_context(user.profile)
+    intern = ctx["level"] in {"internship", "intern"}
+    scored, total = await search_jobs(
+        db,
+        q=None,
+        workplace="remote" if ctx["remote_pref"] != "onsite" else None,
+        pakistan_friendly=bool(ctx["prefer_pakistan"]),
+        career_stage="internship" if intern else None,
+        junior_eligible=not intern,
+        posted_within=2,
+        sort="newest",
+        page=1,
+        page_size=8,
+    )
+    applied_ids = {
+        row
+        for row in (
+            await db.execute(
+                select(SavedJob.job_id).where(
+                    SavedJob.user_id == user.id,
+                    SavedJob.status.in_(("applied", "interview", "offer", "ghosted")),
+                    SavedJob.job_id.is_not(None),
+                )
+            )
+        ).scalars().all()
+        if row
+    }
+    results: list[JobOut] = []
+    for job, score in scored:
+        if job.id in applied_ids:
+            continue
+        if not is_fresh(job, settings.freshness_days):
+            continue
+        item = JobOut.model_validate(job)
+        item.score = float(score or 0)
+        item.skills = job.skills or []
+        item.tech_tags = job.tech_tags or []
+        item.source_kind = source_kind(job.source)
+        item.source_kind_label = source_kind_label(job.source)
+        if item.description_text and len(item.description_text) > 400:
+            item.description_text = item.description_text[:400] + "…"
+        results.append(item)
+        if len(results) >= 8:
+            break
+    empty = None
+    if not results:
+        empty = (
+            "No junior-eligible remote roles posted in the last 48 hours. "
+            "Check Matches or internships — supply is scarce, not padded."
+        )
+    return MatchResponse(
+        total=max(total, len(results)),
+        freshness_days=settings.freshness_days,
+        results=results[:8],
+        empty_reason=empty,
+        profile_complete=True,
+    )
+
+
 @router.post("/onboarding/complete", response_model=OnboardingOut)
 async def complete_onboarding(
     body: OnboardingCompleteRequest,
@@ -307,6 +413,8 @@ async def complete_onboarding(
     elif not extra.get("seed_skills"):
         techs = list(user.profile.technologies or user.profile.skills or [])
         extra["seed_skills"] = [str(s).lower() for s in techs[:2]]
+    if body.experience_level in {"internship", "new_grad", "junior", "mid", "senior"}:
+        user.profile.experience_level = body.experience_level
     user.profile.extra = extra
     await db.commit()
     await db.refresh(user.profile)
@@ -322,10 +430,14 @@ async def onboarding_status(
 
 @router.post("/resume/parse", response_model=ResumeParseResponse)
 async def parse_resume(
+    request: Request,
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ResumeParseResponse:
+    await enforce_rate_limit(
+        request, "resume-parse", limit=10, period_seconds=3600, identity=str(user.id)
+    )
     raw = await file.read()
     if len(raw) > 2_000_000:
         raise HTTPException(status_code=400, detail="Resume too large (max 2MB)")
@@ -574,8 +686,9 @@ async def generate_match_notifications(
 
 
 class ApplicationUpdate(BaseModel):
-    status: Literal["saved", "applied", "interview", "offer", "rejected"]
+    status: Literal["saved", "applied", "interview", "offer", "rejected", "ghosted"]
     notes: str | None = Field(default=None, max_length=5000)
+    checklist: dict | None = None
 
 
 @router.patch("/applications/{saved_id}")
@@ -597,5 +710,17 @@ async def update_application(
     saved.status = body.status
     if body.notes is not None:
         saved.notes = body.notes
+    if body.checklist is not None:
+        saved.checklist = body.checklist
+    if body.status == "applied":
+        mark_applied(saved)
+    elif body.status in {"interview", "offer"}:
+        saved.last_touch_at = datetime.now(timezone.utc)
     await db.commit()
-    return {"id": saved.id, "status": saved.status, "notes": saved.notes}
+    return {
+        "id": saved.id,
+        "status": saved.status,
+        "notes": saved.notes,
+        "applied_at": saved.applied_at,
+        "follow_up_on": saved.follow_up_on,
+    }

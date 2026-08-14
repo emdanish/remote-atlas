@@ -1,5 +1,3 @@
-import { clearAccessToken, getAccessToken } from "@/lib/session";
-
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(
   /\/+$/,
@@ -69,11 +67,8 @@ function humanizeDetail(body: unknown): { message: string; fields?: string[] } {
   return { message: "Request failed" };
 }
 
-export function authHeaders(token?: string | null): HeadersInit {
-  const headers: HeadersInit = { "Content-Type": "application/json" };
-  const resolved = token === undefined ? getAccessToken() : token;
-  if (resolved) headers.Authorization = `Bearer ${resolved}`;
-  return headers;
+export function jsonHeaders(): HeadersInit {
+  return { "Content-Type": "application/json" };
 }
 
 export async function handle<T>(res: Response): Promise<T> {
@@ -89,7 +84,6 @@ export async function handle<T>(res: Response): Promise<T> {
       /* ignore */
     }
     if (res.status === 401) {
-      clearAccessToken();
       message = message || "Please sign in again.";
     } else if (res.status === 429) {
       message = "Too many requests. Wait a moment and try again.";
@@ -104,11 +98,11 @@ export async function handle<T>(res: Response): Promise<T> {
 
 export async function apiFetch<T>(
   path: string,
-  init?: RequestInit & { token?: string | null },
+  init?: RequestInit,
 ): Promise<T> {
-  const { token, headers, ...rest } = init || {};
+  const { headers, ...rest } = init || {};
   const merged: HeadersInit = {
-    ...authHeaders(token),
+    ...jsonHeaders(),
     ...(headers || {}),
   };
   // Allow FormData callers to omit Content-Type

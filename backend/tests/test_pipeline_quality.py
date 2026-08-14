@@ -40,7 +40,8 @@ def test_apply_url_rejects_api_hosts():
 
 
 def test_fingerprint_normalizes_whitespace():
-    assert fingerprint("  Senior  Engineer ", " Acme  ") == "senior engineer|acme"
+    assert fingerprint("  Senior  Engineer ", " Acme  ") == "senior engineer|acme|unknown"
+    assert fingerprint("Intern", "Acme", "internship") == "intern|acme|internship"
 
 
 def test_parse_datetime_epoch_ms():

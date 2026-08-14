@@ -38,10 +38,11 @@ const workplaces = [
 const stages = [
   { value: "", label: "Any experience" },
   { value: "internship", label: "Internship" },
-  { value: "junior", label: "Junior / Entry" },
+  { value: "new_grad", label: "New grad" },
+  { value: "junior", label: "Junior-eligible (entry + intern + unspecified)" },
   { value: "mid", label: "Mid" },
   { value: "senior", label: "Senior" },
-  { value: "unknown", label: "Not specified" },
+  { value: "unknown", label: "Not specified only" },
 ];
 
 const sources = [

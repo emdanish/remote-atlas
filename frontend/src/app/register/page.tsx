@@ -17,6 +17,7 @@ export default function RegisterPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [experienceLevel, setExperienceLevel] = useState("junior");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -25,7 +26,7 @@ export default function RegisterPage() {
     setLoading(true);
     setError(null);
     try {
-      await register(email, password, fullName || undefined);
+      await register(email, password, fullName || undefined, experienceLevel);
       await refresh();
       router.push("/onboarding");
     } catch (err) {
@@ -84,6 +85,28 @@ export default function RegisterPage() {
             placeholder="At least 8 characters"
           />
         </label>
+        <fieldset className="text-sm">
+          <legend className="mb-1.5 font-medium">Where are you in your hunt?</legend>
+          <div className="grid gap-2">
+            {[
+              { value: "internship", label: "Internship" },
+              { value: "new_grad", label: "New graduate" },
+              { value: "junior", label: "Junior / first IC role" },
+            ].map((opt) => (
+              <label key={opt.value} className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="experience_level"
+                  value={opt.value}
+                  checked={experienceLevel === opt.value}
+                  onChange={() => setExperienceLevel(opt.value)}
+                  className="accent-accent"
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
         {error ? (
           <Alert tone="error" title="Couldn’t create account" onDismiss={() => setError(null)}>
             {error}

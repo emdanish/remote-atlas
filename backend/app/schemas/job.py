@@ -19,6 +19,9 @@ class JobOut(BaseModel):
     workplace_type: str
     employment_type: Optional[str] = None
     career_stage: str
+    years_required_min: Optional[int] = None
+    junior_eligible: bool = False
+    seniority_signals: Optional[dict] = None
     skills: list[str] = Field(default_factory=list)
     tech_tags: list[str] = Field(default_factory=list)
     posted_at: Optional[datetime] = None

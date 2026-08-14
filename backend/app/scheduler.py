@@ -17,6 +17,7 @@ import time
 from app.db.session import AsyncSessionLocal
 from app.ingest import run_ingest
 from app.matching.alerts import process_all_saved_search_alerts
+from app.matching.followup import process_application_followups
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("scheduler")
@@ -24,11 +25,17 @@ logger = logging.getLogger("scheduler")
 
 async def run_alerts() -> dict[str, int]:
     async with AsyncSessionLocal() as db:
+        pulse = {"checked": 0, "notified": 0}
+        hunt = {"reminded": 0, "ghosted": 0}
         try:
-            return await process_all_saved_search_alerts(db)
+            pulse = await process_all_saved_search_alerts(db)
         except Exception:  # noqa: BLE001
             logger.exception("Pulse alerts failed")
-            return {"checked": 0, "notified": 0}
+        try:
+            hunt = await process_application_followups(db)
+        except Exception:  # noqa: BLE001
+            logger.exception("Hunt follow-ups failed")
+        return {**pulse, **hunt}
 
 
 async def loop(interval_minutes: int, embed: bool, sources: list[str] | None) -> None:
@@ -73,12 +80,13 @@ def main() -> None:
     if args.once:
         do_embed = bool(args.embed) and not bool(args.ingest_only)
 
-        async def _once() -> None:
-            await run_ingest(sources=args.sources, embed=do_embed)
+        async def _once() -> int:
+            code = await run_ingest(sources=args.sources, embed=do_embed)
             stats = await run_alerts()
             logger.info("Pulse alerts: %s", stats)
+            return code
 
-        asyncio.run(_once())
+        raise SystemExit(asyncio.run(_once()))
         return
     asyncio.run(
         loop(

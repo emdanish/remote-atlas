@@ -14,7 +14,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, TSVECTOR
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -34,6 +34,7 @@ class Job(Base):
         ),
         Index("ix_jobs_skills", "skills", postgresql_using="gin"),
         Index("ix_jobs_tech_tags", "tech_tags", postgresql_using="gin"),
+        Index("ix_jobs_junior_eligible", "junior_eligible"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -56,6 +57,9 @@ class Job(Base):
     pakistan_friendly: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
     employment_type: Mapped[Optional[str]] = mapped_column(String(64))
     career_stage: Mapped[str] = mapped_column(String(32), default="unknown", index=True)
+    years_required_min: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    junior_eligible: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    seniority_signals: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
 
     skills: Mapped[Optional[list[str]]] = mapped_column(ARRAY(String), default=list)
     tech_tags: Mapped[Optional[list[str]]] = mapped_column(ARRAY(String), default=list)

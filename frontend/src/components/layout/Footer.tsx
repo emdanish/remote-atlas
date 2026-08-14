@@ -3,6 +3,8 @@ import { Logo } from "@/components/brand/Logo";
 
 const exploreLinks = [
   { href: "/jobs", label: "Browse jobs" },
+  { href: "/remote-junior-jobs", label: "Junior-eligible" },
+  { href: "/remote-internships", label: "Internships" },
   { href: "/companies", label: "Companies" },
   { href: "/remote-javascript-jobs", label: "JavaScript remote" },
   { href: "/remote-python-jobs", label: "Python remote" },

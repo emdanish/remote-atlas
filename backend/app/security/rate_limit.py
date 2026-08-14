@@ -37,9 +37,15 @@ limiter = InMemoryRateLimiter()
 
 
 def client_ip(request: Request) -> str:
+    """Do not trust the leftmost X-Forwarded-For hop (client-spoofable).
+
+    Render (and most proxies) append the connecting IP. Use the last hop.
+    """
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        return forwarded.split(",", 1)[0].strip()
+        parts = [p.strip() for p in forwarded.split(",") if p.strip()]
+        if parts:
+            return parts[-1]
     return request.client.host if request.client else "unknown"
 
 

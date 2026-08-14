@@ -1,4 +1,10 @@
-"""Local secure storage for resumes and generated PDFs (no object store required)."""
+"""Local secure storage for resumes and generated PDFs.
+
+Render disks are ephemeral: uploaded binaries vanish on dyno restart.
+Extracted resume text lives in Postgres (`user_resumes.extracted_text`) and is
+the durable source of truth. Tailored PDFs are rebuilt on download when the
+file is missing. Do not treat this directory as a backup.
+"""
 
 from __future__ import annotations
 

@@ -12,6 +12,7 @@ import type { Job } from "@/lib/api";
 import {
   formatRelativeDate,
   officialApplyUrl,
+  seniorityBadgeLabel,
   sourceKindLabel,
   titleCase,
   truncate,
@@ -53,8 +54,8 @@ export function JobCard({ job, index = 0 }: { job: Job; index?: number }) {
                 </Badge>
               ) : null}
               <Badge>{titleCase(job.workplace_type)}</Badge>
-              {job.career_stage !== "unknown" ? (
-                <Badge>{titleCase(job.career_stage)}</Badge>
+              {seniorityBadgeLabel(job) ? (
+                <Badge>{seniorityBadgeLabel(job)}</Badge>
               ) : null}
               <time
                 className="text-xs font-medium tabular-nums text-muted"

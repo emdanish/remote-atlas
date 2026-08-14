@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Job
 from app.pipeline.enrich import is_pakistan_friendly_remote
+from app.pipeline.seniority import classify_job
 from app.pipeline.normalize import NormalizedJob, apply_url_is_usable, canonical_apply_url
 from app.pipeline.description import normalize_job_description_fields
 from app.pipeline.source_trust import PREFERRED_SOURCES_ORDER, source_trust_rank
@@ -59,6 +60,15 @@ def _row(job: NormalizedJob, now: datetime) -> dict:
         job.description_html,
         job.description_text,
     )
+    classified = classify_job(
+        title,
+        desc_text,
+        source_level=job.source_level,
+        employment_type=employment_type,
+    )
+    employment_type = (classified.employment_type or employment_type or None)
+    if employment_type:
+        employment_type = employment_type[:60]
 
     return {
         "company_id": job.company_id,
@@ -77,7 +87,10 @@ def _row(job: NormalizedJob, now: datetime) -> dict:
             job.workplace_type or "unknown", location_raw, desc_text
         ),
         "employment_type": employment_type,
-        "career_stage": (job.career_stage or "unknown")[:32],
+        "career_stage": classified.career_stage[:32],
+        "years_required_min": classified.years_required_min,
+        "junior_eligible": classified.junior_eligible,
+        "seniority_signals": classified.signals,
         "skills": (job.skills or [])[:40],
         "tech_tags": (job.tech_tags or [])[:40],
         "posted_at": job.posted_at,
@@ -153,6 +166,9 @@ async def upsert_jobs(session: AsyncSession, jobs: list[NormalizedJob]) -> int:
                 "pakistan_friendly": insert_stmt.excluded.pakistan_friendly,
                 "employment_type": insert_stmt.excluded.employment_type,
                 "career_stage": insert_stmt.excluded.career_stage,
+                "years_required_min": insert_stmt.excluded.years_required_min,
+                "junior_eligible": insert_stmt.excluded.junior_eligible,
+                "seniority_signals": insert_stmt.excluded.seniority_signals,
                 "skills": insert_stmt.excluded.skills,
                 "tech_tags": insert_stmt.excluded.tech_tags,
                 "posted_at": func.coalesce(
@@ -291,7 +307,7 @@ async def suppress_cross_source_duplicates(session: AsyncSession) -> int:
             WITH ranked AS (
               SELECT id,
                      ROW_NUMBER() OVER (
-                       PARTITION BY lower(btrim(title)), lower(btrim(company_name))
+                       PARTITION BY lower(btrim(title)), lower(btrim(company_name)), coalesce(career_stage, 'unknown')
                        ORDER BY
                          CASE {order_case} ELSE 1000 END,
                          CASE WHEN posted_at IS NOT NULL THEN 0 ELSE 1 END,

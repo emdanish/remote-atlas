@@ -21,6 +21,7 @@ class Company(Base):
     career_page_url: Mapped[Optional[str]] = mapped_column(String(1024))
     region_focus: Mapped[str] = mapped_column(String(32), default="global")
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    hires_juniors: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

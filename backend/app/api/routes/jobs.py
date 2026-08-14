@@ -53,7 +53,11 @@ async def jobs_search(
     pakistan_friendly: bool = Query(False, description="Remote roles likely open to PK"),
     skills: Optional[str] = Query(None, description="Comma-separated skills"),
     career_stage: Optional[str] = Query(
-        None, description="internship|junior|mid|senior|unknown"
+        None, description="internship|new_grad|junior (eligible set)|mid|senior|unknown"
+    ),
+    junior_eligible: bool = Query(
+        False,
+        description="Restrict to junior-eligible roles (intern/new-grad/junior/unspecified IC)",
     ),
     source: Optional[str] = Query(None, max_length=64),
     sort: Optional[Literal["newest", "relevance", "company"]] = Query(
@@ -96,6 +100,7 @@ async def jobs_search(
             pakistan_friendly=pakistan_friendly,
             skills=skill_list,
             career_stage=career_stage,
+            junior_eligible=junior_eligible,
             source=source,
             sort=sort_mode,
             page=page,
@@ -114,6 +119,7 @@ async def jobs_search(
             pakistan_friendly=pakistan_friendly,
             skills=skill_list,
             career_stage=career_stage,
+            junior_eligible=junior_eligible,
             source=source,
             sort=sort_mode,
             page=page,

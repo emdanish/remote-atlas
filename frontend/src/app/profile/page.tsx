@@ -174,6 +174,7 @@ export default function ProfilePage() {
               onChange={(e) => setForm({ ...form, experience_level: e.target.value })}
             >
               <option value="internship">Internship</option>
+              <option value="new_grad">New graduate</option>
               <option value="junior">Junior</option>
               <option value="mid">Mid</option>
               <option value="senior">Senior</option>

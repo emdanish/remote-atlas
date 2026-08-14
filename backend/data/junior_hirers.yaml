@@ -1,0 +1,24 @@
+# Curated names known to hire interns / new grads / juniors.
+# Matched case-insensitively against companies.yaml `name` at ingest sync.
+# Discovery script may also set hires_juniors: true on ATS rows.
+names:
+  - GitLab
+  - Canonical
+  - Grafana
+  - Mozilla
+  - Elastic
+  - Buffer
+  - Automattic
+  - Red Hat
+  - HashiCorp
+  - Cloudflare
+  - Vercel
+  - Stripe
+  - Shopify
+  - Spotify
+  - Notion
+  - Figma
+  - Datadog
+  - Sentry
+  - Twitch
+  - Discord

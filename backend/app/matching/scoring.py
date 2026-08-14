@@ -13,6 +13,11 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from app.models.job import Job
+from app.pipeline.seniority import (
+    JUNIOR_ELIGIBLE_STAGES,
+    JUNIOR_PROFILE_LEVELS,
+    exclude_for_junior_profile,
+)
 
 
 @dataclass
@@ -106,21 +111,34 @@ def score_job_breakdown(
         if profile_skills:
             role_score = max(role_score, 8.0)
 
-    # Seniority (0–12) — unknown stage no longer heavily penalizes
+    # Seniority (0–12) — junior profiles must not rank unlabeled 5-year IC as a fit
     seniority_score = 0.0
     level_n = (level or "").lower()
     stage = (job.career_stage or "unknown").lower()
-    if level_n and stage == level_n:
+    eligible = bool(getattr(job, "junior_eligible", False))
+    junior_seeker = level_n in JUNIOR_PROFILE_LEVELS
+    if junior_seeker:
+        if exclude_for_junior_profile(job, level_n):
+            seniority_score = 0.0
+        elif stage in JUNIOR_ELIGIBLE_STAGES:
+            seniority_score = 12.0
+        elif eligible and stage == "unknown":
+            seniority_score = 7.0
+        else:
+            seniority_score = 4.0
+    elif level_n and stage == level_n:
         seniority_score = 12.0
     elif stage == "unknown" or not level_n:
         seniority_score = 8.0
     elif {
         "internship": 0,
+        "new_grad": 1,
         "junior": 1,
         "mid": 2,
         "senior": 3,
     }.get(stage, 1) == {
         "internship": 0,
+        "new_grad": 1,
         "junior": 1,
         "mid": 2,
         "senior": 3,
@@ -129,12 +147,14 @@ def score_job_breakdown(
     elif abs(
         {
             "internship": 0,
+            "new_grad": 1,
             "junior": 1,
             "mid": 2,
             "senior": 3,
         }.get(stage, 1)
         - {
             "internship": 0,
+            "new_grad": 1,
             "junior": 1,
             "mid": 2,
             "senior": 3,

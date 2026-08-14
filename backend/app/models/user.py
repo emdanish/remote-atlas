@@ -67,11 +67,20 @@ class SavedJob(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    job_id: Mapped[int] = mapped_column(
-        ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True
+    job_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("jobs.id", ondelete="SET NULL"), nullable=True, index=True
     )
     notes: Mapped[Optional[str]] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(32), default="saved")
+    job_title: Mapped[Optional[str]] = mapped_column(String(512))
+    company_name: Mapped[Optional[str]] = mapped_column(String(255))
+    apply_url: Mapped[Optional[str]] = mapped_column(String(2048))
+    applied_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    follow_up_on: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), index=True)
+    last_touch_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    resume_tailoring_id: Mapped[Optional[int]] = mapped_column(Integer)
+    checklist: Mapped[Optional[dict]] = mapped_column(JSONB)
+    packet_snapshot: Mapped[Optional[dict]] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped["User"] = relationship("User", back_populates="saved_jobs")

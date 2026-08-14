@@ -43,16 +43,19 @@ class HimalayasCollector(BaseCollector):
         by_guid: dict[str, NormalizedJob] = {}
         sem = asyncio.Semaphore(4)
 
-        async def one_query(query: str) -> list[NormalizedJob]:
+        async def one_search(params: dict) -> list[NormalizedJob]:
             out: list[NormalizedJob] = []
             page = 1
             stale_pages = 0
             while page <= _MAX_PAGES:
+                query = dict(params)
+                query["sort"] = "recent"
+                query["page"] = page
                 async with sem:
                     try:
                         resp = await self.client.get(
                             "https://himalayas.app/jobs/api/search",
-                            params={"q": query, "sort": "recent", "page": page},
+                            params=query,
                         )
                     except httpx.HTTPError:
                         break
@@ -80,8 +83,15 @@ class HimalayasCollector(BaseCollector):
                 page += 1
             return out
 
+        searches: list[dict] = [{"q": q} for q in _SEARCH_QUERIES]
+        searches.extend(
+            [
+                {"seniority": "Entry-level", "worldwide": "true"},
+                {"employment_type": "Intern", "worldwide": "true"},
+            ]
+        )
         batches = await asyncio.gather(
-            *(one_query(q) for q in _SEARCH_QUERIES),
+            *(one_search(s) for s in searches),
             return_exceptions=True,
         )
         for batch in batches:
@@ -145,7 +155,10 @@ class HimalayasCollector(BaseCollector):
             location_raw=location,
             workplace_type=infer_workplace_type(location, "remote", text),
             employment_type=str(item.get("employmentType") or "")[:60] or None,
-            career_stage=infer_career_stage(f"{title} {seniority_hint}", text),
+            career_stage=infer_career_stage(
+                title, text, source_level=seniority_hint or None
+            ),
+            source_level=seniority_hint or None,
             skills=enriched["skills"],
             tech_tags=enriched["tech_tags"],
             posted_at=posted,

@@ -1,27 +1,23 @@
 import { apiFetch } from "./client";
-import { clearAccessToken, setAccessToken } from "@/lib/session";
 import type { Profile, TokenResponse, User } from "./types";
 
 export async function register(
   email: string,
   password: string,
   full_name?: string,
+  experience_level?: string,
 ): Promise<TokenResponse> {
-  const data = await apiFetch<TokenResponse>("/auth/register", {
+  return apiFetch<TokenResponse>("/auth/register", {
     method: "POST",
-    body: JSON.stringify({ email, password, full_name }),
+    body: JSON.stringify({ email, password, full_name, experience_level }),
   });
-  setAccessToken(data.access_token);
-  return data;
 }
 
 export async function login(email: string, password: string): Promise<TokenResponse> {
-  const data = await apiFetch<TokenResponse>("/auth/login", {
+  return apiFetch<TokenResponse>("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
-  setAccessToken(data.access_token);
-  return data;
 }
 
 export async function getMe(): Promise<User> {
@@ -38,9 +34,5 @@ export async function updateProfile(
 }
 
 export async function logout(): Promise<void> {
-  try {
-    await apiFetch<void>("/auth/logout", { method: "POST" });
-  } finally {
-    clearAccessToken();
-  }
+  await apiFetch<void>("/auth/logout", { method: "POST" });
 }

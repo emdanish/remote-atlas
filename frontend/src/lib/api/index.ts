@@ -1,4 +1,4 @@
-export { API_URL, SITE_URL, ApiError, apiFetch, authHeaders, handle } from "./client";
+export { API_URL, SITE_URL, ApiError, apiFetch, handle } from "./client";
 export * from "./types";
 export * from "./jobs";
 export * from "./auth";

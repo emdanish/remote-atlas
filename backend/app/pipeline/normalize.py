@@ -6,6 +6,10 @@ from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
+from app.pipeline.seniority import (
+    classify_job,
+    infer_career_stage,
+)
 from app.pipeline.description import (
     html_to_text,
     looks_like_encoded_html,
@@ -55,10 +59,14 @@ class NormalizedJob:
     workplace_type: str = "unknown"
     employment_type: Optional[str] = None
     career_stage: str = "unknown"
+    years_required_min: Optional[int] = None
+    junior_eligible: bool = False
+    seniority_signals: Optional[dict] = None
     skills: list[str] = field(default_factory=list)
     tech_tags: list[str] = field(default_factory=list)
     posted_at: Optional[datetime] = None
     company_id: Optional[int] = None
+    source_level: Optional[str] = None
 
 
 # Re-export description helpers for collectors
@@ -70,6 +78,8 @@ __all__ = [
     "parse_datetime",
     "infer_workplace_type",
     "infer_career_stage",
+    "classify_job",
+    "apply_classification",
     "fingerprint",
     "apply_url_is_usable",
     "normalize_job_description_fields",
@@ -176,35 +186,47 @@ def infer_workplace_type(
     return "unknown"
 
 
-def infer_career_stage(title: str, description: Optional[str] = None) -> str:
-    # Prefer title signal; avoid scanning huge descriptions for noisy words like "associate".
-    title_l = title.lower()
-    blob = f"{title} {(description or '')[:800]}".lower()
-
-    if re.search(r"\b(intern|internship|trainee)\b", title_l):
-        return "internship"
-    if re.search(r"\b(staff|principal|distinguished|fellow)\b", title_l):
-        return "senior"
-    if re.search(r"\b(senior|sr\.?|lead|manager|director|head of)\b", title_l):
-        return "senior"
-    if re.search(
-        r"\b(new grad|new graduate|university grad|campus hire|entry[\s-]?level|"
-        r"junior|fresher|fresh graduate|associate (software|engineer|developer))\b",
-        title_l,
-    ):
-        return "junior"
-    if re.search(r"\b(mid[\s-]?level|intermediate)\b", title_l):
-        return "mid"
-    # Fallback: internship keywords anywhere in short blob
-    if re.search(r"\b(intern|internship)\b", blob):
-        return "internship"
-    return "unknown"
+def infer_career_stage(
+    title: str,
+    description: Optional[str] = None,
+    *,
+    source_level: Optional[str] = None,
+    employment_type: Optional[str] = None,
+) -> str:
+    return classify_job(
+        title,
+        description,
+        source_level=source_level,
+        employment_type=employment_type,
+    ).career_stage
 
 
-def fingerprint(title: str, company: str) -> str:
+def apply_classification(
+    job: NormalizedJob,
+    *,
+    source_level: Optional[str] = None,
+) -> NormalizedJob:
+    """Fill career_stage, years, junior_eligible, signals on a NormalizedJob."""
+    result = classify_job(
+        job.title,
+        job.description_text,
+        source_level=source_level,
+        employment_type=job.employment_type,
+    )
+    job.career_stage = result.career_stage
+    job.years_required_min = result.years_required_min
+    job.junior_eligible = result.junior_eligible
+    job.seniority_signals = result.signals
+    if result.employment_type:
+        job.employment_type = result.employment_type
+    return job
+
+
+def fingerprint(title: str, company: str, career_stage: str | None = None) -> str:
     t = _WS_RE.sub(" ", (title or "").strip().lower())
     c = _WS_RE.sub(" ", (company or "").strip().lower())
-    return f"{t}|{c}"
+    stage = _WS_RE.sub(" ", (career_stage or "unknown").strip().lower())
+    return f"{t}|{c}|{stage}"
 
 
 def apply_url_is_usable(url: Optional[str]) -> bool:

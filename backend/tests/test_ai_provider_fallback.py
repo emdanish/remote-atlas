@@ -10,13 +10,12 @@ from app.ai.provider import AIProviderError, chat_completion
 
 
 @pytest.mark.asyncio
-async def test_chat_completion_falls_through_gemini_keys_to_deepseek():
-    """Key1 fails → key2 fails → DeepSeek succeeds."""
+async def test_chat_completion_prefers_deepseek_before_gemini():
     calls: list[str] = []
 
     async def fake_gemini(api_key, system, user, temperature, max_tokens, *, model=""):
         calls.append(f"gemini:{api_key}:{model}")
-        raise AIProviderError(f"HTTP 429: quota for {api_key}")
+        return "should-not-run"
 
     async def fake_openai(**kwargs):
         calls.append(f"openai:{kwargs.get('model')}")
@@ -35,9 +34,8 @@ async def test_chat_completion_falls_through_gemini_keys_to_deepseek():
         text = await chat_completion(system="sys", user="hi", max_tokens=32)
 
     assert text == "ok-from-deepseek"
-    assert any(c.startswith("gemini:key-a:") for c in calls)
-    assert any(c.startswith("gemini:key-b:") for c in calls)
     assert "openai:deepseek-chat" in calls
+    assert not any(c.startswith("gemini:") for c in calls)
 
 
 @pytest.mark.asyncio

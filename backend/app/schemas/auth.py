@@ -8,6 +8,7 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     full_name: Optional[str] = Field(default=None, max_length=255)
+    experience_level: Optional[Literal["internship", "new_grad", "junior"]] = None
 
 
 class LoginRequest(BaseModel):
@@ -16,14 +17,16 @@ class LoginRequest(BaseModel):
 
 
 class TokenResponse(BaseModel):
-    access_token: str
+    """Cookie session is HttpOnly. access_token is never returned to JS."""
+
+    ok: bool = True
     token_type: str = "bearer"
 
 
 class ProfileUpdate(BaseModel):
     headline: Optional[str] = Field(default=None, max_length=512)
     bio: Optional[str] = Field(default=None, max_length=5000)
-    experience_level: Optional[Literal["internship", "junior", "mid", "senior"]] = None
+    experience_level: Optional[Literal["internship", "new_grad", "junior", "mid", "senior"]] = None
     # Resume parse often yields 40–100 tags; keep headroom without unbounded payloads
     skills: Optional[list[str]] = Field(default=None, max_length=120)
     technologies: Optional[list[str]] = Field(default=None, max_length=120)
@@ -100,17 +103,22 @@ class UserOut(BaseModel):
 class SavedJobCreate(BaseModel):
     job_id: int
     notes: Optional[str] = Field(default=None, max_length=5000)
-    status: Literal["saved", "applied", "interview", "offer", "rejected"] = "saved"
+    status: Literal["saved", "applied", "interview", "offer", "rejected", "ghosted"] = "saved"
 
 
 class SavedJobOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    job_id: int
+    job_id: Optional[int] = None
     notes: Optional[str] = None
     status: str
     created_at: datetime
     job_title: Optional[str] = None
     company_name: Optional[str] = None
     apply_url: Optional[str] = None
+    applied_at: Optional[datetime] = None
+    follow_up_on: Optional[datetime] = None
+    last_touch_at: Optional[datetime] = None
+    checklist: Optional[dict] = None
+    listing_gone: bool = False

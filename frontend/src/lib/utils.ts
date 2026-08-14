@@ -19,6 +19,16 @@ export function titleCase(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, " ");
 }
 
+export function seniorityBadgeLabel(job: {
+  career_stage?: string | null;
+  junior_eligible?: boolean;
+}): string | null {
+  const stage = (job.career_stage || "unknown").toLowerCase();
+  if (stage && stage !== "unknown") return titleCase(stage);
+  if (job.junior_eligible) return "Seniority not stated";
+  return null;
+}
+
 export function truncate(text: string, max = 160): string {
   const t = text.trim();
   if (t.length <= max) return t;

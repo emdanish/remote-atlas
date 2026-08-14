@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bookmark, Bell, Sparkles, UserRound } from "lucide-react";
+import { Bookmark, Bell, Sparkles, UserRound, ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
   { href: "/matches", label: "Matches", icon: Sparkles },
+  { href: "/hunt", label: "Hunt", icon: ListChecks },
   { href: "/alerts", label: "Pulse", icon: Bell },
   { href: "/saved", label: "Saved jobs", icon: Bookmark },
   { href: "/profile", label: "Profile", icon: UserRound },

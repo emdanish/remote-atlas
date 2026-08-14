@@ -28,6 +28,8 @@ function AlertsInner() {
   const [name, setName] = useState("Remote + my stack");
   const [q, setQ] = useState("");
   const [skills, setSkills] = useState("");
+  const [workplace, setWorkplace] = useState("remote");
+  const [careerStage, setCareerStage] = useState("");
   const [pakistan, setPakistan] = useState(true);
   const [runPreview, setRunPreview] = useState<Awaited<ReturnType<typeof runSavedSearch>> | null>(
     null,
@@ -39,8 +41,15 @@ function AlertsInner() {
   useEffect(() => {
     const q0 = sp.get("q");
     const skills0 = sp.get("skills");
+    const workplace0 = sp.get("workplace");
+    const stage0 = sp.get("career_stage");
+    const pk0 = sp.get("pakistan_friendly");
     if (q0) setQ(q0);
     if (skills0) setSkills(skills0);
+    if (workplace0) setWorkplace(workplace0);
+    if (stage0) setCareerStage(stage0);
+    if (pk0 === "1" || pk0 === "true") setPakistan(true);
+    if (pk0 === "0" || pk0 === "false") setPakistan(false);
   }, [sp]);
 
   const profileSkills = useMemo(() => {
@@ -118,7 +127,9 @@ function AlertsInner() {
             query_params: {
               q: q.trim() || undefined,
               skills: skillCsv || undefined,
-              workplace: "remote",
+              workplace: workplace || "remote",
+              career_stage: careerStage || undefined,
+              junior_eligible: careerStage === "junior" ? true : undefined,
               posted_within: 7,
               pakistan_friendly: pakistan,
             },
@@ -139,6 +150,31 @@ function AlertsInner() {
               onChange={(e) => setQ(e.target.value)}
               placeholder="e.g. staff engineer, platform, or backend"
             />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1.5 block font-medium text-ink">Workplace</span>
+            <select
+              value={workplace}
+              onChange={(e) => setWorkplace(e.target.value)}
+              className="w-full rounded-md border border-line bg-elevated px-3 py-2 text-sm text-ink"
+            >
+              <option value="remote">Remote</option>
+              <option value="hybrid">Hybrid</option>
+              <option value="">Any</option>
+            </select>
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1.5 block font-medium text-ink">Experience</span>
+            <select
+              value={careerStage}
+              onChange={(e) => setCareerStage(e.target.value)}
+              className="w-full rounded-md border border-line bg-elevated px-3 py-2 text-sm text-ink"
+            >
+              <option value="">Any</option>
+              <option value="internship">Internship</option>
+              <option value="junior">Junior-eligible</option>
+              <option value="new_grad">New grad</option>
+            </select>
           </label>
           <label className="block text-sm sm:col-span-2">
             <span className="mb-1.5 block font-medium text-ink">Technologies</span>

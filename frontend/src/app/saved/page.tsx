@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { ExternalLink, Save, Trash2 } from "lucide-react";
+import { Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Alert } from "@/components/ui/Alert";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { WorkspaceNav } from "@/components/workspace/WorkspaceNav";
+import { TrackedApplyButton } from "@/components/jobs/TrackedApplyButton";
 import {
   deleteSaved,
   listSaved,
@@ -26,6 +27,7 @@ const statuses: ApplicationStatus[] = [
   "interview",
   "offer",
   "rejected",
+  "ghosted",
 ];
 
 const statusTone: Record<ApplicationStatus, "neutral" | "accent" | "success" | "warn"> = {
@@ -34,6 +36,7 @@ const statusTone: Record<ApplicationStatus, "neutral" | "accent" | "success" | "
   interview: "warn",
   offer: "success",
   rejected: "neutral",
+  ghosted: "warn",
 };
 
 export default function SavedPage() {
@@ -224,16 +227,38 @@ export default function SavedPage() {
                     ) : null}
                   </div>
                   <h2 className="mt-2 font-display text-xl font-semibold text-ink">
-                    <Link href={`/jobs/${item.job_id}`} className="hover:text-accent">
-                      {item.job_title || `Job #${item.job_id}`}
-                    </Link>
+                    {item.job_id ? (
+                      <Link href={`/jobs/${item.job_id}`} className="hover:text-accent">
+                        {item.job_title || `Job #${item.job_id}`}
+                      </Link>
+                    ) : (
+                      item.job_title || "Listing removed from index"
+                    )}
                   </h2>
                   <p className="mt-1 text-sm text-muted">{item.company_name}</p>
+                  {item.listing_gone ? (
+                    <p className="mt-1 text-xs text-muted">
+                      Original listing left the freshness window. Tracker kept from your snapshot.
+                    </p>
+                  ) : null}
+                  {item.applied_at ? (
+                    <p className="mt-1 text-xs text-muted">
+                      Applied {formatRelativeDate(item.applied_at)}
+                      {item.follow_up_on ? ` · follow up ${formatRelativeDate(item.follow_up_on)}` : ""}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {item.apply_url ? (
+                  {item.apply_url && item.job_id ? (
+                    <TrackedApplyButton
+                      jobId={item.job_id}
+                      applyUrl={item.apply_url}
+                      companyName={item.company_name || undefined}
+                      size="sm"
+                    />
+                  ) : item.apply_url ? (
                     <Button href={item.apply_url} external size="sm">
-                      Apply <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                      Open apply URL
                     </Button>
                   ) : null}
                   <select
