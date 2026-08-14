@@ -17,9 +17,12 @@ import {
   buildJobPostingJsonLd,
   DEFAULT_FRESHNESS_DAYS,
   isJobIndexable,
+  jobHasThinDescription,
   jobSeoDescription,
   jobSeoTitle,
+  listingSummaryText,
   safeJsonLd,
+  toIso8601,
 } from "@/lib/seo";
 import { companySeoHref, skillSeoHref } from "@/lib/seoTaxonomy";
 import {
@@ -41,9 +44,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const description = jobSeoDescription(job);
     const indexable = isJobIndexable(job, DEFAULT_FRESHNESS_DAYS);
     const path = `/jobs/${job.id}`;
+    const posted = toIso8601(job.posted_at || job.first_seen_at);
+    const keywords = uniqueLabels(job.tech_tags, job.skills).slice(0, 12);
     return {
       title,
       description,
+      keywords: keywords.length ? keywords : undefined,
       alternates: { canonical: path },
       robots: indexable
         ? { index: true, follow: true }
@@ -54,6 +60,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         url: `${SITE_URL}${path}`,
         type: "article",
         siteName: "Remote Atlas",
+        ...(posted ? { publishedTime: posted, modifiedTime: posted } : {}),
       },
       twitter: {
         card: "summary_large_image",
@@ -106,6 +113,8 @@ export default async function JobDetailPage({ params }: Props) {
 
   const applyUrl = officialApplyUrl(job);
   const indexable = isJobIndexable(job, DEFAULT_FRESHNESS_DAYS);
+  const postedIso = toIso8601(job.posted_at || job.first_seen_at);
+  const thinDescription = jobHasThinDescription(job);
   const postingLd = buildJobPostingJsonLd(job, {
     freshnessDays: DEFAULT_FRESHNESS_DAYS,
   });
@@ -156,7 +165,7 @@ export default async function JobDetailPage({ params }: Props) {
       ) : null}
 
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <article itemScope itemType="https://schema.org/JobPosting">
+        <article>
           <div className="border-b border-line pb-8">
             <div className="flex flex-wrap gap-2">
               <Badge tone="accent">{job.source}</Badge>
@@ -172,13 +181,10 @@ export default async function JobDetailPage({ params }: Props) {
               ) : null}
               {job.employment_type ? <Badge>{job.employment_type}</Badge> : null}
             </div>
-            <h1
-              className="mt-4 font-display text-3xl font-semibold tracking-tight text-ink sm:text-[2.35rem] sm:leading-[1.15]"
-              itemProp="title"
-            >
+            <h1 className="mt-4 font-display text-3xl font-semibold tracking-tight text-ink sm:text-[2.35rem] sm:leading-[1.15]">
               {job.title}
             </h1>
-            <p className="mt-2 text-lg font-semibold text-ink/85" itemProp="hiringOrganization">
+            <p className="mt-2 text-lg font-semibold text-ink/85">
               <Link
                 href={companySeoHref(job.company_name)}
                 className="hover:text-accent hover:underline"
@@ -190,12 +196,18 @@ export default async function JobDetailPage({ params }: Props) {
               {job.location_raw ? (
                 <span className="inline-flex items-center gap-1.5">
                   <MapPin className="h-4 w-4 shrink-0" aria-hidden />
-                  <span itemProp="jobLocation">{job.location_raw}</span>
+                  <span>{job.location_raw}</span>
                 </span>
               ) : null}
-              <span className="tabular-nums">
-                Posted {formatRelativeDate(job.posted_at || job.first_seen_at)}
-              </span>
+              {postedIso ? (
+                <time className="tabular-nums" dateTime={postedIso}>
+                  Posted {formatRelativeDate(job.posted_at || job.first_seen_at)}
+                </time>
+              ) : (
+                <span className="tabular-nums">
+                  Posted {formatRelativeDate(job.posted_at || job.first_seen_at)}
+                </span>
+              )}
             </div>
 
             {tags.length ? (
@@ -218,9 +230,22 @@ export default async function JobDetailPage({ params }: Props) {
             ) : null}
           </div>
 
-          <div className="mt-10" itemProp="description">
+          <div className="mt-10">
             <h2 className="sr-only">Job description</h2>
-            <JobDescription html={job.description_html} text={job.description_text} />
+            {thinDescription ? (
+              <div className="space-y-3 text-sm leading-6 text-muted">
+                {listingSummaryText(job)
+                  .split("\n\n")
+                  .map((para) => (
+                    <p key={para.slice(0, 48)}>{para}</p>
+                  ))}
+                {job.description_text?.trim() ? (
+                  <JobDescription html={job.description_html} text={job.description_text} />
+                ) : null}
+              </div>
+            ) : (
+              <JobDescription html={job.description_html} text={job.description_text} />
+            )}
           </div>
 
           <div className="mt-12 space-y-8 border-t border-line pt-10">

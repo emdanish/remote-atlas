@@ -8,9 +8,15 @@ type Props = {
   searchParams: Promise<{ page?: string }>;
 };
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { skill } = await params;
-  return skillSeoMetadata(skill.toLowerCase());
+  const sp = await searchParams;
+  const page = Math.max(1, Number(sp.page) || 1);
+  const meta = await skillSeoMetadata(skill.toLowerCase());
+  if (page > 1) {
+    return { ...meta, robots: { index: false, follow: true } };
+  }
+  return meta;
 }
 
 export default async function SkillSeoPage({ params, searchParams }: Props) {

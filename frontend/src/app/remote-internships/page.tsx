@@ -1,26 +1,30 @@
 import type { Metadata } from "next";
 import { SeoLandingShell } from "@/components/seo/SeoLandingShell";
 import { searchJobs, SITE_URL } from "@/lib/api";
-import { buildBreadcrumbJsonLd, safeJsonLd } from "@/lib/seo";
 
 export const revalidate = 1800;
 
 const PATH = "/remote-internships";
 
-export const metadata: Metadata = {
-  title: "Remote internships",
-  description:
-    "Remote software internships from company career pages and trusted public feeds. Apply on the employer’s official site — we never submit for you.",
-  alternates: { canonical: PATH },
-  openGraph: {
-    title: "Remote internships | Remote Atlas",
-    description: "Fresh remote internships in tech. Official apply links only.",
-    url: `${SITE_URL}${PATH}`,
-    siteName: "Remote Atlas",
-  },
-};
-
 type Props = { searchParams: Promise<{ page?: string }> };
+
+export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
+  const sp = await searchParams;
+  const page = Math.max(1, Number(sp.page) || 1);
+  return {
+    title: "Remote internships",
+    description:
+      "Remote software internships from company career pages and trusted public feeds. Apply on the employer’s official site — we never submit for you.",
+    alternates: { canonical: PATH },
+    robots: page > 1 ? { index: false, follow: true } : { index: true, follow: true },
+    openGraph: {
+      title: "Remote internships | Remote Atlas",
+      description: "Fresh remote internships in tech. Official apply links only.",
+      url: `${SITE_URL}${PATH}`,
+      siteName: "Remote Atlas",
+    },
+  };
+}
 
 export default async function RemoteInternshipsPage({ searchParams }: Props) {
   const sp = await searchParams;
@@ -39,11 +43,8 @@ export default async function RemoteInternshipsPage({ searchParams }: Props) {
     { name: "Jobs", path: "/jobs" },
     { name: "Internships", path: PATH },
   ];
-  const ld = buildBreadcrumbJsonLd(breadcrumb);
   return (
-    <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(ld) }} />
-      <SeoLandingShell
+    <SeoLandingShell
         h1="Remote internships"
         intro="Software internships from official ATS boards and public feeds. Confirm pay, dates, and work authorization on the employer page. We never submit applications for you."
         jobCount={results.total}
@@ -55,6 +56,5 @@ export default async function RemoteInternshipsPage({ searchParams }: Props) {
         total={results.total}
         basePath={PATH}
       />
-    </>
   );
 }

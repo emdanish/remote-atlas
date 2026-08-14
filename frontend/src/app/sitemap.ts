@@ -53,8 +53,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const seoRoutes: MetadataRoute.Sitemap = [];
   try {
     const [skills, companies, countries, cities] = await Promise.all([
-      getSeoSkills(80),
-      getSeoCompanies(80),
+      getSeoSkills(120),
+      getSeoCompanies(120),
       getSeoLocations("country"),
       getSeoLocations("city"),
     ]);

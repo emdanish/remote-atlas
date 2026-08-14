@@ -3,8 +3,8 @@ import { SITE_URL } from "@/lib/api";
 
 /**
  * Crawl policy:
- * - Index: home, base /jobs discovery, individual /jobs/{id}
- * - Block: account, workspace, auth, onboarding
+ * - Index: home, /jobs, /jobs/{id}, SEO landings
+ * - Block: account, workspace, auth, onboarding, hunt, internal rewrite targets
  * Faceted /jobs?* URLs are not disallowed (so share links resolve) but get
  * X-Robots-Tag: noindex via middleware + canonical to /jobs.
  */
@@ -21,6 +21,8 @@ export default function robots(): MetadataRoute.Robots {
           "/saved/",
           "/matches",
           "/matches/",
+          "/hunt",
+          "/hunt/",
           "/alerts",
           "/alerts/",
           "/onboarding",
@@ -30,6 +32,7 @@ export default function robots(): MetadataRoute.Robots {
           "/register",
           "/register/",
           "/api/",
+          "/seo/",
         ],
       },
     ],

@@ -5,6 +5,7 @@ import { SectionLabel } from "@/components/ui/SectionLabel";
 import type { Job } from "@/lib/api/types";
 import type { SeoTaxonomyItem } from "@/lib/api/seo";
 import { ChevronRight } from "lucide-react";
+import { buildBreadcrumbJsonLd, buildCollectionJsonLd, safeJsonLd } from "@/lib/seo";
 
 type Crumb = { name: string; path: string };
 
@@ -43,6 +44,23 @@ export function SeoLandingShell({
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(buildBreadcrumbJsonLd(breadcrumb)) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: safeJsonLd(
+            buildCollectionJsonLd({
+              name: h1,
+              path: basePath,
+              description: intro,
+              jobs,
+            }),
+          ),
+        }}
+      />
       <nav aria-label="Breadcrumb" className="mb-5 flex flex-wrap items-center gap-1 text-sm text-muted">
         {breadcrumb.map((b, i) => (
           <span key={b.path} className="inline-flex items-center gap-1">

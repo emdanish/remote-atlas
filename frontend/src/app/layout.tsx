@@ -40,13 +40,12 @@ export const metadata: Metadata = {
     "tech jobs",
     "software engineer jobs",
     "developer jobs",
+    "junior remote jobs",
+    "remote internships",
     "job search",
     "ATS jobs",
     "Remote Atlas",
   ],
-  alternates: {
-    canonical: "/",
-  },
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -84,9 +83,13 @@ export const metadata: Metadata = {
 const orgJsonLd = {
   "@context": "https://schema.org",
   "@type": "Organization",
+  "@id": `${SITE_URL}/#organization`,
   name: "Remote Atlas",
   url: SITE_URL,
-  logo: absoluteUrl("/brand/logo.svg"),
+  logo: {
+    "@type": "ImageObject",
+    url: absoluteUrl("/brand/logo.svg"),
+  },
   description:
     "Developer-focused job discovery engine with verified official apply links and a strict freshness window.",
 };
@@ -94,8 +97,10 @@ const orgJsonLd = {
 const siteJsonLd = {
   "@context": "https://schema.org",
   "@type": "WebSite",
+  "@id": `${SITE_URL}/#website`,
   name: "Remote Atlas",
   url: SITE_URL,
+  publisher: { "@id": `${SITE_URL}/#organization` },
   potentialAction: {
     "@type": "SearchAction",
     target: {

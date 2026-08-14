@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { SeoLandingShell } from "@/components/seo/SeoLandingShell";
 import { getSeoLocation, getSeoLocations, getSeoSkills, searchJobs, SITE_URL } from "@/lib/api";
-import { buildBreadcrumbJsonLd, safeJsonLd } from "@/lib/seo";
 
 export const revalidate = 1800;
 
@@ -11,8 +10,10 @@ type Props = {
   searchParams: Promise<{ page?: string }>;
 };
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { country } = await params;
+  const sp = await searchParams;
+  const page = Math.max(1, Number(sp.page) || 1);
   const meta = await getSeoLocation(country, "country").catch(() => null);
   if (!meta) {
     return { title: "Location not found", robots: { index: false, follow: true } };
@@ -27,6 +28,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title,
     description,
     alternates: { canonical: path },
+    robots: page > 1 ? { index: false, follow: true } : { index: true, follow: true },
     openGraph: {
       title: `${title} | Remote Atlas`,
       description,
@@ -81,15 +83,12 @@ export default async function CountrySeoPage({ params, searchParams }: Props) {
   const path = `/remote-jobs/${country}`;
   const breadcrumb = [
     { name: "Home", path: "/" },
-    { name: "Remote jobs", path: "/jobs?workplace=remote" },
+    { name: "Jobs", path: "/jobs" },
     { name: meta.label, path },
   ];
-  const ld = buildBreadcrumbJsonLd(breadcrumb);
 
   return (
-    <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(ld) }} />
-      <SeoLandingShell
+    <SeoLandingShell
         h1={
           country === "worldwide"
             ? "Worldwide remote jobs"
@@ -114,6 +113,5 @@ export default async function CountrySeoPage({ params, searchParams }: Props) {
         ]}
         relatedTitle="Related exploration"
       />
-    </>
   );
 }

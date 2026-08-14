@@ -7,7 +7,6 @@ import { notFound } from "next/navigation";
 import { SeoLandingShell } from "@/components/seo/SeoLandingShell";
 import { getSeoSkill, getSeoSkills, searchJobs, SITE_URL } from "@/lib/api";
 import { skillTagsForSlug } from "@/lib/seoTaxonomy";
-import { buildBreadcrumbJsonLd, safeJsonLd } from "@/lib/seo";
 
 export const revalidate = 1800;
 
@@ -65,15 +64,9 @@ export async function SkillSeoLanding({ skill, page }: Props) {
     { name: `Remote ${meta.label} Jobs`, path },
   ];
   const related = relatedSkills.filter((s) => s.slug !== skill).slice(0, 8);
-  const ld = buildBreadcrumbJsonLd(breadcrumb);
 
   return (
-    <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: safeJsonLd(ld) }}
-      />
-      <SeoLandingShell
+    <SeoLandingShell
         h1={`Remote ${meta.label} Jobs`}
         intro={`Fresh remote ${meta.label} roles from authentic ATS boards and public tech feeds. Apply on the employer's official career page — listings outside the freshness window leave the active index automatically.`}
         jobCount={results.total || meta.count}
@@ -87,6 +80,5 @@ export async function SkillSeoLanding({ skill, page }: Props) {
         related={related}
         relatedTitle="Related skills"
       />
-    </>
   );
 }

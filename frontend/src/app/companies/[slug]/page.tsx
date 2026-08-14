@@ -8,7 +8,6 @@ import {
   searchJobs,
   SITE_URL,
 } from "@/lib/api";
-import { buildBreadcrumbJsonLd, safeJsonLd } from "@/lib/seo";
 
 export const revalidate = 1800;
 
@@ -17,8 +16,10 @@ type Props = {
   searchParams: Promise<{ page?: string }>;
 };
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { slug } = await params;
+  const sp = await searchParams;
+  const page = Math.max(1, Number(sp.page) || 1);
   const meta = await getSeoCompany(slug).catch(() => null);
   if (!meta) {
     return { title: "Company not found", robots: { index: false, follow: true } };
@@ -30,6 +31,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title,
     description,
     alternates: { canonical: path },
+    robots: page > 1 ? { index: false, follow: true } : { index: true, follow: true },
     openGraph: {
       title: `${title} | Remote Atlas`,
       description,
@@ -65,12 +67,9 @@ export default async function CompanySeoPage({ params, searchParams }: Props) {
     { name: "Companies", path: "/companies" },
     { name: meta.label, path },
   ];
-  const ld = buildBreadcrumbJsonLd(breadcrumb);
 
   return (
-    <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(ld) }} />
-      <SeoLandingShell
+    <SeoLandingShell
         h1={`Jobs at ${meta.label}`}
         intro={`Active roles associated with ${meta.label} in the Remote Atlas freshness window. Apply only through official employer links.`}
         jobCount={meta.count}
@@ -84,6 +83,5 @@ export default async function CompanySeoPage({ params, searchParams }: Props) {
         related={[...skills.slice(0, 4), ...companies.filter((c) => c.slug !== slug).slice(0, 4)]}
         relatedTitle="Explore more"
       />
-    </>
   );
 }
