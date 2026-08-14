@@ -118,6 +118,7 @@ export default function SavedPage() {
       interview: 0,
       offer: 0,
       rejected: 0,
+      ghosted: 0,
     };
     for (const item of savedQuery.data || []) result[item.status] += 1;
     return result;
@@ -143,7 +144,7 @@ export default function SavedPage() {
       </p>
       <WorkspaceNav />
 
-      <section className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-5" aria-label="Application summary">
+      <section className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6" aria-label="Application summary">
         {statuses.map((status) => (
           <button
             type="button"
