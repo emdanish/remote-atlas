@@ -1,9 +1,12 @@
 import { ImageResponse } from "next/og";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
-export const runtime = "edge";
 export const alt = "Remote Atlas — candidate-first job discovery";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
+
+const logo = readFileSync(join(process.cwd(), "public/icon-192.png"));
 
 export default function OpenGraphImage() {
   return new ImageResponse(
@@ -20,16 +23,24 @@ export default function OpenGraphImage() {
           fontFamily: "system-ui, sans-serif",
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            fontSize: 28,
-            letterSpacing: "0.28em",
-            fontWeight: 700,
-            color: "#5EEAD4",
-          }}
-        >
-          REMOTE ATLAS
+        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+          <img
+            src={`data:image/png;base64,${logo.toString("base64")}`}
+            width={72}
+            height={72}
+            alt=""
+          />
+          <div
+            style={{
+              display: "flex",
+              fontSize: 28,
+              letterSpacing: "0.28em",
+              fontWeight: 700,
+              color: "#5EEAD4",
+            }}
+          >
+            REMOTE ATLAS
+          </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           <div

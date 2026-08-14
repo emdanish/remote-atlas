@@ -72,8 +72,14 @@ export const metadata: Metadata = {
     },
   },
   icons: {
-    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
-    apple: [{ url: "/icon.svg" }],
+    icon: [
+      { url: "/icon-48.png", sizes: "48x48", type: "image/png" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/favicon.ico", sizes: "48x48", type: "image/x-icon" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    shortcut: "/favicon.ico",
   },
   other: {
     "theme-color": "#0B1F1A",
@@ -88,8 +94,11 @@ const orgJsonLd = {
   url: SITE_URL,
   logo: {
     "@type": "ImageObject",
-    url: absoluteUrl("/brand/logo.svg"),
+    url: absoluteUrl("/icon-512.png"),
+    width: 512,
+    height: 512,
   },
+  image: absoluteUrl("/icon-512.png"),
   description:
     "Developer-focused job discovery engine with verified official apply links and a strict freshness window.",
 };
