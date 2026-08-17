@@ -235,7 +235,6 @@ async def hybrid_search(
         select(Job)
         .options(
             defer(Job.embedding),
-            defer(Job.description_html),
             defer(Job.search_tsv),
         )
         .where(Job.id.in_(page_ids))

@@ -18,7 +18,6 @@ def _base_fresh_query(days: int | None = None) -> Select:
         select(Job)
         .options(
             defer(Job.embedding),
-            defer(Job.description_html),
             defer(Job.search_tsv),
         )
         .where(Job.is_active.is_(True))
