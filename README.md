@@ -69,7 +69,7 @@ pgvector width as before. Local FastEmbed/`BAAI/bge-base-en-v1.5` exceeds Render
 Starter's **512 MiB** at model load (proven in production OOM logs), so it is not
 installed on the cron image.
 
-Daily cron (`python -m app.deploy cron --embed`):
+Weekly cron (`python -m app.deploy cron --embed`):
 
 1. **Ingest process** — crawl, upsert, housekeeping, pulse alerts → `INGESTION STATUS = SUCCESS`
 2. **Embed process** — incremental Gemini pass for missing/changed/provider-mismatched jobs
@@ -90,7 +90,7 @@ Repeat until `/health/ingest` reports the desired coverage.
 The repository includes a Render Blueprint for:
 
 - `remote-atlas-api`: free-tier-compatible FastAPI web service.
-- `remote-atlas-ingest`: **Cron Job** that runs once per day (`0 1 * * *` UTC = 06:00 PKT).
+- `remote-atlas-ingest`: **Cron Job** that runs once a week on Sunday (`0 1 * * 0` UTC = 06:00 PKT).
 
 Both services run Alembic before their commands (web startup / cron start). A
 PostgreSQL advisory lock prevents migration races. Render checks
@@ -152,7 +152,7 @@ python -m app.scheduler --once
 
 1. Register a temporary account; confirm session cookies work over HTTPS.
 2. Search jobs, open a detail page, tailor a resume if keys are configured.
-3. Open Render → cron job → **Logs** after `0 6 * * *` UTC or **Trigger Run**.
+3. Open Render → cron job → **Logs** after `0 1 * * 0` UTC (Sunday 06:00 PKT) or **Trigger Run**.
 4. Confirm `/health/ingest` inventory numbers match the landing page live index.
 
 ## Production commands
@@ -160,7 +160,7 @@ python -m app.scheduler --once
 | Purpose | Command |
 |---|---|
 | API process | `python -m app.deploy web` |
-| Daily cron (ingest + embed) | `python -m app.deploy cron --embed` |
+| Weekly cron (ingest + embed) | `python -m app.deploy cron --embed` |
 | Manual ingest only | `python -m app.scheduler --once --ingest-only` |
 | Manual embed pass | `python -m app.ingest embed` |
 | Liveness | `GET /health` |

@@ -4,6 +4,7 @@ from typing import Optional
 
 from sqlalchemy import Select, and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 
 from app.config import get_settings
 from app.models import Job
@@ -15,6 +16,11 @@ def _base_fresh_query(days: int | None = None) -> Select:
     cutoff = freshness_cutoff(days)
     return (
         select(Job)
+        .options(
+            defer(Job.embedding),
+            defer(Job.description_html),
+            defer(Job.search_tsv),
+        )
         .where(Job.is_active.is_(True))
         .where(
             or_(

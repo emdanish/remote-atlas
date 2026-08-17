@@ -42,7 +42,7 @@ services:
       - key: PERPLEXITY_API_KEY
         sync: false
 
-  # Daily full crawl at 06:00 Pakistan Time (PKT = UTC+5) → 01:00 UTC.
+  # Weekly full crawl: Sunday 06:00 Pakistan Time (PKT = UTC+5) → 01:00 UTC.
   # Starter plan (512Mi). Ingest and embed run as SEPARATE processes.
   # Production embeddings use Gemini HTTP — local BGE/ONNX OOMs at model load.
   - type: cron
@@ -51,7 +51,7 @@ services:
     plan: starter
     region: singapore
     rootDir: backend
-    schedule: "0 1 * * *"
+    schedule: "0 1 * * 0"
     buildCommand: pip install --upgrade pip && pip install -r requirements-ingest.txt
     startCommand: python -m app.deploy cron --embed
     autoDeployTrigger: commit
@@ -59,6 +59,8 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: DATABASE_URL_SYNC
+        sync: false
+      - key: JWT_SECRET
         sync: false
       - key: FRESHNESS_DAYS
         value: "30"

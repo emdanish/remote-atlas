@@ -1,14 +1,16 @@
 """Async SQLAlchemy engine + session factory.
 
-Neon / serverless poolers need extra care with asyncpg:
+Hosted Postgres (Neon, Aiven, Render) needs extra care with asyncpg:
 - strip libpq-only query params (sslmode, channel_binding)
-- use connect_args ssl for remote hosts
+- use an SSL context that matches sslmode=require (encrypt; Aiven's project CA
+  is not in the public trust store, so full verify would fail)
 - set statement_cache_size=0 for transaction-mode poolers (-pooler host)
 """
 
 from __future__ import annotations
 
 import logging
+import ssl
 from collections.abc import AsyncGenerator
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
@@ -18,6 +20,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+
+def _require_tls_context() -> ssl.SSLContext:
+    """TLS for sslmode=require: encrypt traffic, do not demand a public CA."""
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
 
 # Query keys understood by libpq / Neon UI, not by asyncpg via SQLAlchemy URL
 _ASYNCPG_STRIP_QUERY_KEYS = {
@@ -52,8 +62,8 @@ def prepare_async_database_url(url: str) -> tuple[str, dict[str, Any]]:
 
     connect_args: dict[str, Any] = {}
     if not is_local:
-        # Neon and most hosted Postgres require TLS; asyncpg uses this flag, not sslmode=
-        connect_args["ssl"] = True
+        # asyncpg ignores sslmode= in the URL; this matches libpq sslmode=require
+        connect_args["ssl"] = _require_tls_context()
 
     # Neon / PgBouncer transaction poolers break prepared statement caching
     if "pooler" in host or host.endswith(".neon.tech"):

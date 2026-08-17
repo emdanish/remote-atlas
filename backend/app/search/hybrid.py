@@ -4,6 +4,7 @@ from typing import Optional
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 
 from app.config import get_settings
 from app.models import Job
@@ -182,7 +183,7 @@ async def hybrid_search(
     where_sql = " AND ".join(filters)
     vec_sql = text(
         f"""
-        SELECT id, location_raw, workplace_type, description_text, skills, tech_tags
+        SELECT id
         FROM jobs
         WHERE {where_sql}
         ORDER BY embedding <=> CAST(:qvec AS vector)
@@ -230,7 +231,15 @@ async def hybrid_search(
             page_size=page_size,
         )
 
-    result = await session.execute(select(Job).where(Job.id.in_(page_ids)))
+    result = await session.execute(
+        select(Job)
+        .options(
+            defer(Job.embedding),
+            defer(Job.description_html),
+            defer(Job.search_tsv),
+        )
+        .where(Job.id.in_(page_ids))
+    )
     by_id = {j.id: j for j in result.scalars().all()}
     scored = [(by_id[jid], score) for jid, score in page_slice if jid in by_id]
     total = max(fts_total, len(fused))

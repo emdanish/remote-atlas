@@ -159,8 +159,14 @@ async def upsert_jobs(session: AsyncSession, jobs: list[NormalizedJob]) -> int:
                 "company_url": insert_stmt.excluded.company_url,
                 "career_page_url": insert_stmt.excluded.career_page_url,
                 "apply_url": insert_stmt.excluded.apply_url,
-                "description_text": insert_stmt.excluded.description_text,
-                "description_html": insert_stmt.excluded.description_html,
+                "description_text": case(
+                    (content_changed, insert_stmt.excluded.description_text),
+                    else_=Job.description_text,
+                ),
+                "description_html": case(
+                    (content_changed, insert_stmt.excluded.description_html),
+                    else_=Job.description_html,
+                ),
                 "location_raw": insert_stmt.excluded.location_raw,
                 "workplace_type": insert_stmt.excluded.workplace_type,
                 "pakistan_friendly": insert_stmt.excluded.pakistan_friendly,
