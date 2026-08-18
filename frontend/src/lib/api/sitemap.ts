@@ -16,7 +16,7 @@ export type SitemapEntriesResponse = {
 /** Server-only: lightweight job IDs for XML sitemaps. */
 export async function getSitemapEntries(
   page = 1,
-  pageSize = 5000,
+  pageSize = 2000,
 ): Promise<SitemapEntriesResponse> {
   const qs = new URLSearchParams({
     page: String(page),

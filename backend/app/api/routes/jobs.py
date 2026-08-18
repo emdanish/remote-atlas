@@ -156,7 +156,9 @@ async def jobs_sitemap_entries(
 ) -> SitemapEntriesResponse:
     """
     Lightweight public feed for XML sitemaps.
-    Active + fresh jobs only — no descriptions or private data.
+    Newest active + fresh jobs with a real description — no private data.
+    Thin/empty descriptions are omitted so Google is not asked to crawl
+    thousands of near-duplicate low-content URLs.
     """
     await enforce_rate_limit(request, "job-sitemap", limit=30)
     settings = get_settings()
@@ -165,19 +167,21 @@ async def jobs_sitemap_entries(
         Job.posted_at >= cutoff,
         (Job.posted_at.is_(None)) & (Job.first_seen_at >= cutoff),
     )
+    has_description = func.coalesce(func.length(Job.description_text), 0) >= 60
+    sitemap_filter = (Job.is_active.is_(True), fresh_clause, has_description)
 
     count_result = await db.execute(
         select(func.count())
         .select_from(Job)
-        .where(Job.is_active.is_(True), fresh_clause)
+        .where(*sitemap_filter)
     )
     total = int(count_result.scalar_one() or 0)
 
     last_mod = func.coalesce(Job.posted_at, Job.last_seen_at, Job.first_seen_at)
     result = await db.execute(
         select(Job.id, last_mod.label("last_modified"))
-        .where(Job.is_active.is_(True), fresh_clause)
-        .order_by(Job.id.desc())
+        .where(*sitemap_filter)
+        .order_by(last_mod.desc().nulls_last(), Job.id.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
     )

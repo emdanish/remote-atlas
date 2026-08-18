@@ -18,6 +18,7 @@ import {
   DEFAULT_FRESHNESS_DAYS,
   isJobIndexable,
   jobHasThinDescription,
+  jobPostedRaw,
   jobSeoDescription,
   jobSeoTitle,
   listingSummaryText,
@@ -44,7 +45,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const description = jobSeoDescription(job);
     const indexable = isJobIndexable(job, DEFAULT_FRESHNESS_DAYS);
     const path = `/jobs/${job.id}`;
-    const posted = toIso8601(job.posted_at || job.first_seen_at);
+    const posted = toIso8601(jobPostedRaw(job));
     const keywords = uniqueLabels(job.tech_tags, job.skills).slice(0, 12);
     return {
       title,
@@ -69,10 +70,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       },
     };
   } catch {
-    return {
-      title: "Job not found",
-      robots: { index: false, follow: true },
-    };
+    return notFound();
   }
 }
 
@@ -113,7 +111,7 @@ export default async function JobDetailPage({ params }: Props) {
 
   const applyUrl = officialApplyUrl(job);
   const indexable = isJobIndexable(job, DEFAULT_FRESHNESS_DAYS);
-  const postedIso = toIso8601(job.posted_at || job.first_seen_at);
+  const postedIso = toIso8601(jobPostedRaw(job));
   const thinDescription = jobHasThinDescription(job);
   const postingLd = buildJobPostingJsonLd(job, {
     freshnessDays: DEFAULT_FRESHNESS_DAYS,
@@ -201,11 +199,11 @@ export default async function JobDetailPage({ params }: Props) {
               ) : null}
               {postedIso ? (
                 <time className="tabular-nums" dateTime={postedIso}>
-                  Posted {formatRelativeDate(job.posted_at || job.first_seen_at)}
+                  Posted {formatRelativeDate(jobPostedRaw(job))}
                 </time>
               ) : (
                 <span className="tabular-nums">
-                  Posted {formatRelativeDate(job.posted_at || job.first_seen_at)}
+                  Posted {formatRelativeDate(jobPostedRaw(job))}
                 </span>
               )}
             </div>

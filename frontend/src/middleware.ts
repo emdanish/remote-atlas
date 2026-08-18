@@ -14,6 +14,7 @@ const PRIVATE_PREFIXES = [
 
 /**
  * - Rewrite /remote-{skill}-jobs → /seo/skills/{skill} (defense in depth with next.config)
+ * - 308 /seo/skills/{skill} → /remote-{skill}-jobs (leaked rewrite targets)
  * - Faceted /jobs?* : noindex,follow
  * - Private routes: noindex,nofollow
  *
@@ -22,6 +23,13 @@ const PRIVATE_PREFIXES = [
  */
 export function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
+
+  const leakedSeo = pathname.match(/^\/seo\/skills\/([a-z0-9]+(?:-[a-z0-9]+)*)\/?$/i);
+  if (leakedSeo?.[1]) {
+    const url = request.nextUrl.clone();
+    url.pathname = `/remote-${leakedSeo[1].toLowerCase()}-jobs`;
+    return NextResponse.redirect(url, 308);
+  }
 
   const skillMatch = pathname.match(/^\/remote-([a-z0-9]+(?:-[a-z0-9]+)*)-jobs\/?$/i);
   if (skillMatch) {
@@ -52,6 +60,7 @@ export const config = {
   matcher: [
     // Compiles to /^\/remote-([^\/#\?]+?)-jobs[\/#\?]?$/i
     "/remote-:skill-jobs",
+    "/seo/skills/:path*",
     "/jobs",
     "/profile/:path*",
     "/saved/:path*",

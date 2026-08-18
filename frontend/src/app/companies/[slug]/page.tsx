@@ -21,9 +21,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.page) || 1);
   const meta = await getSeoCompany(slug).catch(() => null);
-  if (!meta) {
-    return { title: "Company not found", robots: { index: false, follow: true } };
-  }
+  if (!meta || meta.count < 1) notFound();
   const path = `/companies/${slug}`;
   const title = `Remote jobs at ${meta.label}`;
   const description = `Browse ${meta.count.toLocaleString()} fresh roles at ${meta.label} on Remote Atlas. Open official career pages when you apply.`;
@@ -47,7 +45,7 @@ export default async function CompanySeoPage({ params, searchParams }: Props) {
   const page = Math.max(1, Number(sp.page) || 1);
   const pageSize = 20;
   const meta = await getSeoCompany(slug).catch(() => null);
-  if (!meta) notFound();
+  if (!meta || meta.count < 1) notFound();
 
   const [results, skills, companies] = await Promise.all([
     searchJobs({
@@ -60,6 +58,8 @@ export default async function CompanySeoPage({ params, searchParams }: Props) {
     getSeoSkills(8).catch(() => []),
     getSeoCompanies(8).catch(() => []),
   ]);
+
+  if (page === 1 && results.total === 0) notFound();
 
   const path = `/companies/${slug}`;
   const breadcrumb = [

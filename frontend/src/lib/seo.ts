@@ -216,8 +216,16 @@ export function toIso8601(raw?: string | null): string | undefined {
   return new Date(t).toISOString();
 }
 
-export function jobAgeDays(job: Pick<Job, "posted_at" | "first_seen_at">): number | null {
-  const raw = job.posted_at || job.first_seen_at;
+export function jobPostedRaw(
+  job: Pick<Job, "posted_at" | "first_seen_at" | "last_seen_at">,
+): string | null | undefined {
+  return job.posted_at || job.first_seen_at || job.last_seen_at;
+}
+
+export function jobAgeDays(
+  job: Pick<Job, "posted_at" | "first_seen_at" | "last_seen_at">,
+): number | null {
+  const raw = jobPostedRaw(job);
   if (!raw) return null;
   const t = new Date(raw).getTime();
   if (Number.isNaN(t)) return null;
@@ -226,7 +234,7 @@ export function jobAgeDays(job: Pick<Job, "posted_at" | "first_seen_at">): numbe
 
 /** Fresh + active jobs are indexable; expired/inactive stay accessible but noindex. */
 export function isJobIndexable(
-  job: Pick<Job, "is_active" | "posted_at" | "first_seen_at">,
+  job: Pick<Job, "is_active" | "posted_at" | "first_seen_at" | "last_seen_at">,
   freshnessDays: number = DEFAULT_FRESHNESS_DAYS,
 ): boolean {
   if (job.is_active === false) return false;
@@ -236,11 +244,10 @@ export function isJobIndexable(
 }
 
 export function jobValidThroughIso(
-  job: Pick<Job, "posted_at" | "first_seen_at">,
+  job: Pick<Job, "posted_at" | "first_seen_at" | "last_seen_at">,
   freshnessDays: number = DEFAULT_FRESHNESS_DAYS,
 ): string | undefined {
-  const raw = job.posted_at || job.first_seen_at;
-  const startIso = toIso8601(raw);
+  const startIso = toIso8601(jobPostedRaw(job));
   if (!startIso) return undefined;
   const start = new Date(startIso).getTime();
   return new Date(start + freshnessDays * 86_400_000).toISOString();
@@ -339,15 +346,71 @@ function postalAddressJsonLd(addr: ParsedPostalAddress): Record<string, unknown>
   return address;
 }
 
-function applicantRequirements(addr: ParsedPostalAddress | null, locRaw?: string | null) {
-  if (addr?.addressCountry) {
-    return { "@type": "Country", name: addr.addressCountry };
+const ISO_TO_GOOGLE_NAME: Record<string, string> = {
+  US: "USA",
+  GB: "United Kingdom",
+  AE: "United Arab Emirates",
+  KR: "South Korea",
+  CZ: "Czechia",
+  NZ: "New Zealand",
+  ZA: "South Africa",
+  HK: "Hong Kong",
+};
+
+function titleCaseCountryName(name: string): string {
+  return name
+    .split(/\s+/)
+    .map((w) => (w.length ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
+export function googleCountryName(iso: string): string {
+  const code = iso.toUpperCase();
+  if (ISO_TO_GOOGLE_NAME[code]) return ISO_TO_GOOGLE_NAME[code];
+  const names = Object.entries(COUNTRY_NAME_TO_ISO)
+    .filter(([, c]) => c === code)
+    .map(([n]) => n)
+    .filter((n) => n.length > 2);
+  const best = names.sort((a, b) => b.length - a.length)[0];
+  return best ? titleCaseCountryName(best) : code;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * ISO countries mentioned in source location text. Never infers a street.
+ * Short ISO tokens (IN, CA, US) are ignored in free text to avoid false hits.
+ */
+export function parseApplicantCountryIsos(raw?: string | null): string[] {
+  const isos = new Set<string>();
+  const parsed = parsePostalAddress(raw);
+  if (parsed?.addressCountry) isos.add(parsed.addressCountry);
+
+  const text = (raw || "").toLowerCase();
+  if (text) {
+    const phrases = Object.entries(COUNTRY_NAME_TO_ISO)
+      .filter(([name]) => name.length >= 4 || name === "usa" || name === "uae")
+      .sort((a, b) => b[0].length - a[0].length);
+    for (const [name, iso] of phrases) {
+      const re = new RegExp(`(^|[^a-z])${escapeRegExp(name)}([^a-z]|$)`);
+      if (re.test(text)) isos.add(iso);
+    }
   }
-  const loc = (locRaw || "").trim();
-  if (loc && !isVagueRemoteLocation(loc) && loc.length <= 80) {
-    return { "@type": "AdministrativeArea", name: loc.slice(0, 80) };
-  }
-  return undefined;
+  return [...isos];
+}
+
+export function applicantLocationRequirementsJsonLd(
+  locRaw?: string | null,
+): Record<string, string> | Array<Record<string, string>> {
+  const isos = parseApplicantCountryIsos(locRaw);
+  const countries = (isos.length ? isos : ["Worldwide"]).map((iso) =>
+    iso === "Worldwide"
+      ? { "@type": "Country", name: "Worldwide" }
+      : { "@type": "Country", name: googleCountryName(iso) },
+  );
+  return countries.length === 1 ? countries[0] : countries;
 }
 
 /** Map free-text employment to Schema.org / Google JobPosting enums. */
@@ -366,7 +429,8 @@ export function mapEmploymentType(raw?: string | null): string | string[] | unde
   return mapped.length === 1 ? mapped[0] : mapped;
 }
 
-export function jobEmploymentType(job: Pick<Job, "employment_type" | "career_stage">): string | string[] | undefined {
+/** Always emit a Google enum. Unmapped source text becomes OTHER — never invent FULL_TIME. */
+export function jobEmploymentType(job: Pick<Job, "employment_type" | "career_stage">): string | string[] {
   const mapped = mapEmploymentType(job.employment_type);
   const internStage = (job.career_stage || "").toLowerCase() === "internship";
   if (internStage) {
@@ -375,7 +439,7 @@ export function jobEmploymentType(job: Pick<Job, "employment_type" | "career_sta
     if (!list.includes("INTERN")) return [...list, "INTERN"];
     return mapped;
   }
-  return mapped;
+  return mapped ?? "OTHER";
 }
 
 /** Plain text → minimal safe HTML for JobPosting.description (Google accepts <br>/<p>). */
@@ -409,6 +473,9 @@ export function listingSummaryText(job: Job): string {
     job.location_raw ? `Location: ${job.location_raw}.` : null,
     job.employment_type ? `Employment: ${job.employment_type}.` : null,
     `Workplace: ${workplace}.`,
+    job.workplace_type === "remote"
+      ? "This role is listed as fully remote by the source."
+      : null,
     "This listing is indexed from the employer’s official career system. Apply on the company page. Remote Atlas never submits applications.",
   ]
     .filter(Boolean)
@@ -428,7 +495,7 @@ export function buildJobPostingJsonLd(
 ): Record<string, unknown> | null {
   if (!isJobIndexable(job, opts?.freshnessDays)) return null;
 
-  const datePosted = toIso8601(job.posted_at || job.first_seen_at);
+  const datePosted = toIso8601(jobPostedRaw(job));
   if (!datePosted) return null;
 
   const org: Record<string, unknown> = {
@@ -439,11 +506,18 @@ export function buildJobPostingJsonLd(
   if (sameAs) org.sameAs = sameAs;
   if (job.company_url) org.url = job.company_url;
 
+  const wt = (job.workplace_type || "").toLowerCase();
+  const fullyRemote = wt === "remote";
+  let description = jobPostingDescriptionHtml(job);
+  if (fullyRemote && !/remote|work from home|telecommut|wfh/i.test(description)) {
+    description = `<p>This role is listed as fully remote by the source.</p>${description}`;
+  }
+
   const posting: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "JobPosting",
     title: job.title,
-    description: jobPostingDescriptionHtml(job),
+    description,
     datePosted,
     hiringOrganization: org,
     identifier: {
@@ -453,29 +527,43 @@ export function buildJobPostingJsonLd(
     },
     url: absoluteUrl(jobCanonicalPath(job.id)),
     inLanguage: "en",
+    employmentType: jobEmploymentType(job),
   };
 
   const validThrough = jobValidThroughIso(job, opts?.freshnessDays);
   if (validThrough) posting.validThrough = validThrough;
 
-  const emp = jobEmploymentType(job);
-  if (emp) posting.employmentType = emp;
-
-  const wt = (job.workplace_type || "").toLowerCase();
   const parsed = parsePostalAddress(job.location_raw);
-  const fullyRemote = wt === "remote";
+  const isHybrid = wt === "hybrid";
+  const isOnsite = wt === "onsite";
 
   if (fullyRemote) {
-    // 100% remote: TELECOMMUTE + applicant country. Do not emit a stub Place
-    // (missing street/postal/region is what Search Console reported).
+    // Google: TELECOMMUTE jobs MUST name at least one applicant country.
+    // Vague "Remote" / empty → Worldwide. Never invent a stub Place/street.
     posting.jobLocationType = "TELECOMMUTE";
-    const req = applicantRequirements(parsed, job.location_raw);
-    if (req) posting.applicantLocationRequirements = req;
+    posting.applicantLocationRequirements = applicantLocationRequirementsJsonLd(
+      job.location_raw,
+    );
+  } else if (isHybrid && parsed) {
+    posting.jobLocation = {
+      "@type": "Place",
+      address: postalAddressJsonLd(parsed),
+    };
+  } else if (isHybrid) {
+    posting.jobLocationType = "TELECOMMUTE";
+    posting.applicantLocationRequirements = applicantLocationRequirementsJsonLd(
+      job.location_raw,
+    );
   } else if (parsed) {
     posting.jobLocation = {
       "@type": "Place",
       address: postalAddressJsonLd(parsed),
     };
+  } else if (!isOnsite) {
+    posting.jobLocationType = "TELECOMMUTE";
+    posting.applicantLocationRequirements = applicantLocationRequirementsJsonLd(
+      job.location_raw,
+    );
   }
 
   if (job.years_required_min != null && job.years_required_min >= 0) {

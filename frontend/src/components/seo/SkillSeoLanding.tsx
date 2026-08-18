@@ -17,9 +17,7 @@ type Props = {
 
 export async function skillSeoMetadata(skill: string): Promise<Metadata> {
   const meta = await getSeoSkill(skill).catch(() => null);
-  if (!meta) {
-    return { title: "Skill not found", robots: { index: false, follow: true } };
-  }
+  if (!meta || meta.count < 1) notFound();
   const path = `/remote-${skill}-jobs`;
   const title = `Remote ${meta.label} Jobs`;
   const description = `Find ${meta.count.toLocaleString()} fresh remote ${meta.label} jobs from company career systems and trusted feeds. Browse current openings and apply on the employer's official site.`;
@@ -41,7 +39,23 @@ export async function skillSeoMetadata(skill: string): Promise<Metadata> {
 export async function SkillSeoLanding({ skill, page }: Props) {
   const pageSize = 20;
   const meta = await getSeoSkill(skill).catch(() => null);
-  if (!meta) notFound();
+  if (!meta || meta.count < 1) notFound();
+
+  const tags = skillTagsForSlug(skill);
+  const [results, relatedSkills] = await Promise.all([
+    searchJobs({
+      skills: tags,
+      // Skill landings are remote-first; counts use the same workplace filter.
+      workplace: "remote",
+      page,
+      page_size: pageSize,
+      sort: "newest",
+      hybrid: false,
+    }),
+    getSeoSkills(12).catch(() => []),
+  ]);
+
+  if (page === 1 && results.total === 0) notFound();
 
   const tags = skillTagsForSlug(skill);
   const [results, relatedSkills] = await Promise.all([

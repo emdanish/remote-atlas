@@ -8,11 +8,13 @@ import {
 } from "@/lib/api";
 
 /**
- * Single /sitemap.xml: static hubs + quality SEO landings + fresh jobs.
- * Faceted /jobs?* URLs are intentionally omitted (noindex via middleware).
+ * Single /sitemap.xml: static hubs + quality SEO landings + a capped set of
+ * the newest fresh jobs. Google was discovering 5k+ job URLs and leaving most
+ * as "Discovered – currently not indexed"; a huge sitemap of similar pages
+ * wastes crawl budget. Faceted /jobs?* URLs stay omitted (noindex via middleware).
  */
-const PAGE_SIZE = 5000;
-const MAX_URLS = 50_000;
+const PAGE_SIZE = 2000;
+const MAX_JOB_URLS = 2000;
 
 export const revalidate = 3600;
 
@@ -52,9 +54,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const seoRoutes: MetadataRoute.Sitemap = [];
   try {
+    // API max limit is 80; requesting 120 previously 422'd and dropped all hubs.
     const [skills, companies, countries, cities] = await Promise.all([
-      getSeoSkills(120),
-      getSeoCompanies(120),
+      getSeoSkills(80),
+      getSeoCompanies(80),
       getSeoLocations("country"),
       getSeoLocations("city"),
     ]);
@@ -90,7 +93,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     let page = 1;
     let total = Infinity;
-    const headroom = MAX_URLS - staticRoutes.length - seoRoutes.length;
+    const headroom = MAX_JOB_URLS;
 
     while (jobRoutes.length < headroom) {
       const remaining = headroom - jobRoutes.length;
@@ -107,7 +110,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             ? new Date(entry.last_modified)
             : new Date(),
           changeFrequency: "daily",
-          priority: 0.7,
+          priority: 0.6,
         });
       }
 

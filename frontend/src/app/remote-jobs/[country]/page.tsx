@@ -15,9 +15,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.page) || 1);
   const meta = await getSeoLocation(country, "country").catch(() => null);
-  if (!meta) {
-    return { title: "Location not found", robots: { index: false, follow: true } };
-  }
+  if (!meta || meta.count < 1) notFound();
   const path = `/remote-jobs/${country}`;
   const title =
     country === "worldwide"
@@ -44,7 +42,7 @@ export default async function CountrySeoPage({ params, searchParams }: Props) {
   const page = Math.max(1, Number(sp.page) || 1);
   const pageSize = 20;
   const meta = await getSeoLocation(country, "country").catch(() => null);
-  if (!meta) notFound();
+  if (!meta || meta.count < 1) notFound();
 
   const searchParamsJob =
     country === "pakistan"
@@ -79,6 +77,8 @@ export default async function CountrySeoPage({ params, searchParams }: Props) {
     getSeoSkills(8).catch(() => []),
     getSeoLocations("country").catch(() => []),
   ]);
+
+  if (page === 1 && results.total === 0) notFound();
 
   const path = `/remote-jobs/${country}`;
   const breadcrumb = [

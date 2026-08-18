@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   compress: true,
+  trailingSlash: false,
   async rewrites() {
     // Public Remote-OK style skill URLs are a single path segment.
     // Middleware alone is insufficient if matchers are invalid; rewrites

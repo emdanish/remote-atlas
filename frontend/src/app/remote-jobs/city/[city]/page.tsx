@@ -15,9 +15,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.page) || 1);
   const meta = await getSeoLocation(city, "city").catch(() => null);
-  if (!meta) {
-    return { title: "City not found", robots: { index: false, follow: true } };
-  }
+  if (!meta || meta.count < 1) notFound();
   const path = `/remote-jobs/city/${city}`;
   const title = `Jobs mentioning ${meta.label}`;
   const description = `Browse ${meta.count.toLocaleString()} fresh roles that mention ${meta.label} in source location data on Remote Atlas.`;
@@ -41,7 +39,7 @@ export default async function CitySeoPage({ params, searchParams }: Props) {
   const page = Math.max(1, Number(sp.page) || 1);
   const pageSize = 20;
   const meta = await getSeoLocation(city, "city").catch(() => null);
-  if (!meta) notFound();
+  if (!meta || meta.count < 1) notFound();
 
   const [results, skills, cities] = await Promise.all([
     searchJobs({
@@ -54,6 +52,8 @@ export default async function CitySeoPage({ params, searchParams }: Props) {
     getSeoSkills(8).catch(() => []),
     getSeoLocations("city").catch(() => []),
   ]);
+
+  if (page === 1 && results.total === 0) notFound();
 
   const path = `/remote-jobs/city/${city}`;
   const breadcrumb = [
