@@ -57,20 +57,6 @@ export async function SkillSeoLanding({ skill, page }: Props) {
 
   if (page === 1 && results.total === 0) notFound();
 
-  const tags = skillTagsForSlug(skill);
-  const [results, relatedSkills] = await Promise.all([
-    searchJobs({
-      skills: tags,
-      // Skill landings are remote-first; counts use the same workplace filter.
-      workplace: "remote",
-      page,
-      page_size: pageSize,
-      sort: "newest",
-      hybrid: false,
-    }),
-    getSeoSkills(12).catch(() => []),
-  ]);
-
   const path = `/remote-${skill}-jobs`;
   const breadcrumb = [
     { name: "Home", path: "/" },

@@ -70,7 +70,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       },
     };
   } catch {
-    return notFound();
+    notFound();
   }
 }
 
@@ -198,11 +198,11 @@ export default async function JobDetailPage({ params }: Props) {
                 </span>
               ) : null}
               {postedIso ? (
-                <time className="tabular-nums" dateTime={postedIso}>
+                <time className="tabular-nums" dateTime={postedIso} suppressHydrationWarning>
                   Posted {formatRelativeDate(jobPostedRaw(job))}
                 </time>
               ) : (
-                <span className="tabular-nums">
+                <span className="tabular-nums" suppressHydrationWarning>
                   Posted {formatRelativeDate(jobPostedRaw(job))}
                 </span>
               )}

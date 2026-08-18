@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { MapPin } from "lucide-react";
 import { m, useReducedMotion } from "motion/react";
 import GlareHover from "@/components/GlareHover";
@@ -20,7 +21,12 @@ import {
 } from "@/lib/utils";
 
 export function JobCard({ job, index = 0 }: { job: Job; index?: number }) {
+  // useReducedMotion() is false during SSR but may flip after hydration — keep the
+  // first client paint identical to the server markup to avoid hard client crashes.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const reduceMotion = useReducedMotion();
+  const animateIn = mounted && !reduceMotion;
   const tags = uniqueLabels(job.tech_tags, job.skills).slice(0, 5);
   const fresh = job.posted_at || job.first_seen_at;
   const applyUrl = officialApplyUrl(job);
@@ -28,12 +34,12 @@ export function JobCard({ job, index = 0 }: { job: Job; index?: number }) {
 
   return (
     <m.article
-      initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+      initial={animateIn ? { opacity: 0, y: 6 } : false}
       animate={{ opacity: 1, y: 0 }}
       transition={
-        reduceMotion
-          ? { duration: 0 }
-          : { delay: Math.min(index * 0.02, 0.16), duration: 0.28, ease: [0.22, 1, 0.36, 1] }
+        animateIn
+          ? { delay: Math.min(index * 0.02, 0.16), duration: 0.28, ease: [0.22, 1, 0.36, 1] }
+          : { duration: 0 }
       }
       className="rounded-xl border border-line bg-elevated shadow-soft transition-[border-color,box-shadow] duration-200 hover:border-accent/25 hover:shadow-lift"
     >
@@ -60,6 +66,7 @@ export function JobCard({ job, index = 0 }: { job: Job; index?: number }) {
               <time
                 className="text-xs font-medium tabular-nums text-muted"
                 dateTime={fresh || undefined}
+                suppressHydrationWarning
               >
                 {formatRelativeDate(fresh)}
               </time>

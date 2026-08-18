@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { m, useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
 
@@ -12,8 +13,12 @@ export function Reveal({
   className?: string;
   delay?: number;
 }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const reduce = useReducedMotion();
-  if (reduce) return <div className={className}>{children}</div>;
+  if (!mounted || reduce) {
+    return <div className={className}>{children}</div>;
+  }
   return (
     <m.div
       className={className}
