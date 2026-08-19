@@ -73,10 +73,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         description,
       },
     };
-  } catch {
+  } catch (err) {
     // Never notFound() here — Next 15 streams metadata after HTML. A rejection
     // in this function becomes a fatal client "Server Components render" error
     // even when the page body rendered successfully.
+    console.error("[jobs/[id] generateMetadata]", err);
     return { title: "Job listing", robots: { index: false, follow: true } };
   }
 }

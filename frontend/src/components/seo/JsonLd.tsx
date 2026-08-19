@@ -1,10 +1,13 @@
-import Script from "next/script";
 import { safeJsonLd } from "@/lib/seo";
 
-/** JSON-LD via next/script so it does not collide with streamed generateMetadata. */
+/**
+ * JSON-LD as a normal script tag (Next.js documented approach).
+ * Do not use next/script here — it is a client component and collides with
+ * streamed generateMetadata (AsyncMetadataOutlet) on dynamic routes.
+ */
 export function JsonLd({ id, data }: { id: string; data: unknown }) {
   return (
-    <Script
+    <script
       id={id}
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: safeJsonLd(data) }}

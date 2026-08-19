@@ -5,6 +5,10 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   compress: true,
   trailingSlash: false,
+  // OG image is a standalone /api/og route. Include the mark in that trace only.
+  outputFileTracingIncludes: {
+    "/api/og": ["./public/icon-192.png"],
+  },
   async rewrites() {
     // Public Remote-OK style skill URLs are a single path segment.
     // Middleware alone is insufficient if matchers are invalid; rewrites

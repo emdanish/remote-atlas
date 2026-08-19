@@ -1,14 +1,10 @@
 import { ImageResponse } from "next/og";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readOgLogoPng } from "@/lib/ogAssets";
 
-export const alt = "Remote Atlas — candidate-first job discovery";
-export const size = { width: 1200, height: 630 };
-export const contentType = "image/png";
+export const runtime = "nodejs";
 
-const logo = readFileSync(join(process.cwd(), "public/icon-192.png"));
-
-export default function OpenGraphImage() {
+export async function GET() {
+  const logo = readOgLogoPng();
   return new ImageResponse(
     (
       <div
@@ -63,6 +59,6 @@ export default function OpenGraphImage() {
         </div>
       </div>
     ),
-    { ...size },
+    { width: 1200, height: 630 },
   );
 }

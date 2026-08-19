@@ -55,11 +55,20 @@ export const metadata: Metadata = {
     description:
       "Fresh roles from trusted sources. Semantic + keyword search. Resume tailoring without inventing experience.",
     url: SITE_URL,
+    images: [
+      {
+        url: "/api/og",
+        width: 1200,
+        height: 630,
+        alt: "Remote Atlas — candidate-first job discovery",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Remote Atlas",
     description: "A job search engine built for candidates — not recruiters.",
+    images: ["/api/og"],
   },
   robots: {
     index: true,
