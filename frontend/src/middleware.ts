@@ -44,6 +44,11 @@ export function middleware(request: NextRequest) {
 
   const response = NextResponse.next();
 
+  const page = Number(searchParams.get("page") || "1");
+  if (Number.isFinite(page) && page > 1) {
+    response.headers.set("X-Robots-Tag", "noindex, follow");
+  }
+
   if (pathname === "/jobs" && searchParams.toString().length > 0) {
     response.headers.set("X-Robots-Tag", "noindex, follow");
     return response;
@@ -62,6 +67,10 @@ export const config = {
     "/remote-:skill-jobs",
     "/seo/skills/:path*",
     "/jobs",
+    "/remote-junior-jobs",
+    "/remote-internships",
+    "/remote-jobs/:path*",
+    "/companies/:path*",
     "/profile/:path*",
     "/saved/:path*",
     "/matches/:path*",

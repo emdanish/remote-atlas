@@ -1,4 +1,4 @@
-import { apiFetch } from "./client";
+import { ApiError, apiFetch } from "./client";
 import type { Profile, TokenResponse, User } from "./types";
 
 export async function register(
@@ -20,8 +20,13 @@ export async function login(email: string, password: string): Promise<TokenRespo
   });
 }
 
-export async function getMe(): Promise<User> {
-  return apiFetch<User>("/auth/me");
+export async function getMe(): Promise<User | null> {
+  try {
+    return await apiFetch<User>("/auth/me");
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) return null;
+    throw err;
+  }
 }
 
 export async function updateProfile(

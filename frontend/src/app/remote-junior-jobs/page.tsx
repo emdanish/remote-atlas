@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { SeoLandingShell } from "@/components/seo/SeoLandingShell";
-import { searchJobs, SITE_URL } from "@/lib/api";
+import { searchJobs } from "@/lib/api";
 
 export const revalidate = 1800;
 
@@ -8,25 +8,20 @@ const PATH = "/remote-junior-jobs";
 
 type Props = { searchParams: Promise<{ page?: string }> };
 
-export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
-  const sp = await searchParams;
-  const page = Math.max(1, Number(sp.page) || 1);
-  const description =
-    "Junior-eligible remote tech roles: internships, new-grad, junior titles, and unspecified IC jobs that do not ask for 3+ years. Apply on the employer’s official page.";
-  return {
-    title: "Remote junior and entry-level jobs",
-    description,
-    alternates: { canonical: PATH },
-    robots: page > 1 ? { index: false, follow: true } : { index: true, follow: true },
-    openGraph: {
-      title: "Remote junior and entry-level jobs | Remote Atlas",
-      description:
-        "Entry-level and intern remote tech roles from company ATS boards. We never relabel senior IC jobs as junior.",
-      url: `${SITE_URL}${PATH}`,
-      siteName: "Remote Atlas",
-    },
-  };
-}
+export const metadata: Metadata = {
+  title: "Remote junior and entry-level jobs",
+  description:
+    "Junior-eligible remote tech roles: internships, new-grad, junior titles, and unspecified IC jobs that do not ask for 3+ years. Apply on the employer’s official page.",
+  alternates: { canonical: PATH },
+  robots: { index: true, follow: true },
+  openGraph: {
+    title: "Remote junior and entry-level jobs | Remote Atlas",
+    description:
+      "Entry-level and intern remote tech roles from company ATS boards. We never relabel senior IC jobs as junior.",
+    url: PATH,
+    siteName: "Remote Atlas",
+  },
+};
 
 export default async function RemoteJuniorJobsPage({ searchParams }: Props) {
   const sp = await searchParams;

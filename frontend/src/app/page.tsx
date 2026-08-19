@@ -14,7 +14,7 @@ import { HeroHeadline } from "@/components/marketing/HeroHeadline";
 import { Reveal } from "@/components/marketing/Reveal";
 import { StatCounter } from "@/components/marketing/StatCounter";
 import { getIngestStats, getSeoLocations, getSeoSkills } from "@/lib/api";
-import { safeJsonLd } from "@/lib/seo";
+import { JsonLd } from "@/components/seo/JsonLd";
 
 export const metadata: Metadata = {
   title: {
@@ -110,10 +110,7 @@ export default async function LandingPage() {
 
   return (
     <div>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: safeJsonLd(faqJsonLd) }}
-      />
+      <JsonLd id="ld-faq" data={faqJsonLd} />
       {/* Hero — brand first, search-led product composition */}
       <section className="relative overflow-hidden border-b border-line bg-ink text-white">
         <div className="absolute inset-0 atlas-dark-grid opacity-50" aria-hidden />

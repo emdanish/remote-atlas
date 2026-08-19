@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { SeoLandingShell } from "@/components/seo/SeoLandingShell";
-import { getSeoLocation, getSeoLocations, getSeoSkills, searchJobs, SITE_URL } from "@/lib/api";
+import { getSeoLocation, getSeoLocations, getSeoSkills, searchJobs } from "@/lib/api";
 
 export const revalidate = 1800;
 
@@ -10,12 +10,12 @@ type Props = {
   searchParams: Promise<{ page?: string }>;
 };
 
-export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { country } = await params;
-  const sp = await searchParams;
-  const page = Math.max(1, Number(sp.page) || 1);
   const meta = await getSeoLocation(country, "country").catch(() => null);
-  if (!meta || meta.count < 1) notFound();
+  if (!meta || meta.count < 1) {
+    return { title: "Location not found", robots: { index: false, follow: true } };
+  }
   const path = `/remote-jobs/${country}`;
   const title =
     country === "worldwide"
@@ -26,11 +26,11 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     title,
     description,
     alternates: { canonical: path },
-    robots: page > 1 ? { index: false, follow: true } : { index: true, follow: true },
+    robots: { index: true, follow: true },
     openGraph: {
       title: `${title} | Remote Atlas`,
       description,
-      url: `${SITE_URL}${path}`,
+      url: path,
       siteName: "Remote Atlas",
     },
   };

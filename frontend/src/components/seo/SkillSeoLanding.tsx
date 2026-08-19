@@ -5,7 +5,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { SeoLandingShell } from "@/components/seo/SeoLandingShell";
-import { getSeoSkill, getSeoSkills, searchJobs, SITE_URL } from "@/lib/api";
+import { getSeoSkill, getSeoSkills, searchJobs } from "@/lib/api";
 import { skillTagsForSlug } from "@/lib/seoTaxonomy";
 
 export const revalidate = 1800;
@@ -17,7 +17,9 @@ type Props = {
 
 export async function skillSeoMetadata(skill: string): Promise<Metadata> {
   const meta = await getSeoSkill(skill).catch(() => null);
-  if (!meta || meta.count < 1) notFound();
+  if (!meta || meta.count < 1) {
+    return { title: "Skill not found", robots: { index: false, follow: true } };
+  }
   const path = `/remote-${skill}-jobs`;
   const title = `Remote ${meta.label} Jobs`;
   const description = `Find ${meta.count.toLocaleString()} fresh remote ${meta.label} jobs from company career systems and trusted feeds. Browse current openings and apply on the employer's official site.`;
@@ -29,7 +31,7 @@ export async function skillSeoMetadata(skill: string): Promise<Metadata> {
     openGraph: {
       title: `${title} | Remote Atlas`,
       description,
-      url: `${SITE_URL}${path}`,
+      url: path,
       siteName: "Remote Atlas",
       type: "website",
     },

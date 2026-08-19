@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { SeoLandingShell } from "@/components/seo/SeoLandingShell";
-import { searchJobs, SITE_URL } from "@/lib/api";
+import { searchJobs } from "@/lib/api";
 
 export const revalidate = 1800;
 
@@ -8,23 +8,19 @@ const PATH = "/remote-internships";
 
 type Props = { searchParams: Promise<{ page?: string }> };
 
-export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
-  const sp = await searchParams;
-  const page = Math.max(1, Number(sp.page) || 1);
-  return {
-    title: "Remote internships",
-    description:
-      "Remote software internships from company career pages and trusted public feeds. Apply on the employer’s official site — we never submit for you.",
-    alternates: { canonical: PATH },
-    robots: page > 1 ? { index: false, follow: true } : { index: true, follow: true },
-    openGraph: {
-      title: "Remote internships | Remote Atlas",
-      description: "Fresh remote internships in tech. Official apply links only.",
-      url: `${SITE_URL}${PATH}`,
-      siteName: "Remote Atlas",
-    },
-  };
-}
+export const metadata: Metadata = {
+  title: "Remote internships",
+  description:
+    "Remote software internships from company career pages and trusted public feeds. Apply on the employer’s official site — we never submit for you.",
+  alternates: { canonical: PATH },
+  robots: { index: true, follow: true },
+  openGraph: {
+    title: "Remote internships | Remote Atlas",
+    description: "Fresh remote internships in tech. Official apply links only.",
+    url: PATH,
+    siteName: "Remote Atlas",
+  },
+};
 
 export default async function RemoteInternshipsPage({ searchParams }: Props) {
   const sp = await searchParams;

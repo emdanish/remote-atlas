@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/Button";
 import { JobCard } from "@/components/jobs/JobCard";
 import { SaveJobButton } from "@/components/jobs/SaveJobButton";
 import { TrackedApplyButton } from "@/components/jobs/TrackedApplyButton";
-import { getJob, searchJobs, SITE_URL } from "@/lib/api";
+import { cache } from "react";
+import { getJob as fetchJob, searchJobs } from "@/lib/api";
 import {
   buildBreadcrumbJsonLd,
   buildJobPostingJsonLd,
@@ -22,9 +23,9 @@ import {
   jobSeoDescription,
   jobSeoTitle,
   listingSummaryText,
-  safeJsonLd,
   toIso8601,
 } from "@/lib/seo";
+import { JsonLd } from "@/components/seo/JsonLd";
 import { companySeoHref, skillSeoHref } from "@/lib/seoTaxonomy";
 import {
   formatRelativeDate,
@@ -37,15 +38,20 @@ import {
 
 type Props = { params: Promise<{ id: string }> };
 
+const getJob = cache(fetchJob);
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
+  const jobId = Number(id);
+  if (!Number.isFinite(jobId)) {
+    return { title: "Job not found", robots: { index: false, follow: true } };
+  }
   try {
-    const job = await getJob(Number(id));
+    const job = await getJob(jobId);
     const title = jobSeoTitle(job);
     const description = jobSeoDescription(job);
     const indexable = isJobIndexable(job, DEFAULT_FRESHNESS_DAYS);
     const path = `/jobs/${job.id}`;
-    const posted = toIso8601(jobPostedRaw(job));
     const keywords = uniqueLabels(job.tech_tags, job.skills).slice(0, 12);
     return {
       title,
@@ -58,10 +64,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       openGraph: {
         title,
         description,
-        url: `${SITE_URL}${path}`,
-        type: "article",
+        url: path,
         siteName: "Remote Atlas",
-        ...(posted ? { publishedTime: posted, modifiedTime: posted } : {}),
       },
       twitter: {
         card: "summary_large_image",
@@ -70,7 +74,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       },
     };
   } catch {
-    notFound();
+    // Never notFound() here — Next 15 streams metadata after HTML. A rejection
+    // in this function becomes a fatal client "Server Components render" error
+    // even when the page body rendered successfully.
+    return { title: "Job listing", robots: { index: false, follow: true } };
   }
 }
 
@@ -126,16 +133,8 @@ export default async function JobDetailPage({ params }: Props) {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-      {postingLd ? (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: safeJsonLd(postingLd) }}
-        />
-      ) : null}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: safeJsonLd(breadcrumbLd) }}
-      />
+      {postingLd ? <JsonLd id={`ld-job-${job.id}`} data={postingLd} /> : null}
+      <JsonLd id={`ld-job-crumb-${job.id}`} data={breadcrumbLd} />
 
       <nav aria-label="Breadcrumb" className="mb-6 flex flex-wrap items-center gap-1 text-sm text-muted">
         <Link href="/" className="hover:text-ink">

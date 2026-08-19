@@ -34,7 +34,7 @@ function LoginForm() {
         const user = await getMe();
         if (
           (!nextRaw || nextRaw === "/jobs") &&
-          user.onboarding &&
+          user?.onboarding &&
           !user.onboarding.onboarding_complete
         ) {
           dest = "/onboarding";

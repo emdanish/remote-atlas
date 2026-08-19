@@ -105,15 +105,18 @@ export async function apiFetch<T>(
     ...jsonHeaders(),
     ...(headers || {}),
   };
+  // Cookies are browser-only. credentials:include on the server (generateMetadata)
+  // is a common source of Next.js streaming-metadata failures.
+  const credentials = typeof window === "undefined" ? "omit" : "include";
   // Allow FormData callers to omit Content-Type
   if (rest.body instanceof FormData) {
     const h = new Headers(merged);
     h.delete("Content-Type");
-    const res = await fetch(`${API_URL}${path}`, { credentials: "include", ...rest, headers: h });
+    const res = await fetch(`${API_URL}${path}`, { credentials, ...rest, headers: h });
     return handle<T>(res);
   }
   const res = await fetch(`${API_URL}${path}`, {
-    credentials: "include",
+    credentials,
     ...rest,
     headers: merged,
   });

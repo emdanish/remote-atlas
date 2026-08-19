@@ -6,7 +6,6 @@ import {
   getSeoCompany,
   getSeoSkills,
   searchJobs,
-  SITE_URL,
 } from "@/lib/api";
 
 export const revalidate = 1800;
@@ -16,12 +15,12 @@ type Props = {
   searchParams: Promise<{ page?: string }>;
 };
 
-export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const sp = await searchParams;
-  const page = Math.max(1, Number(sp.page) || 1);
   const meta = await getSeoCompany(slug).catch(() => null);
-  if (!meta || meta.count < 1) notFound();
+  if (!meta || meta.count < 1) {
+    return { title: "Company not found", robots: { index: false, follow: true } };
+  }
   const path = `/companies/${slug}`;
   const title = `Remote jobs at ${meta.label}`;
   const description = `Browse ${meta.count.toLocaleString()} fresh roles at ${meta.label} on Remote Atlas. Open official career pages when you apply.`;
@@ -29,11 +28,11 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     title,
     description,
     alternates: { canonical: path },
-    robots: page > 1 ? { index: false, follow: true } : { index: true, follow: true },
+    robots: { index: true, follow: true },
     openGraph: {
       title: `${title} | Remote Atlas`,
       description,
-      url: `${SITE_URL}${path}`,
+      url: path,
       siteName: "Remote Atlas",
     },
   };

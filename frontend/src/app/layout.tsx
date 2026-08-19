@@ -6,7 +6,8 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { OnboardingBanner } from "@/components/onboarding/OnboardingBanner";
 import { SITE_URL } from "@/lib/api";
-import { absoluteUrl, safeJsonLd } from "@/lib/seo";
+import { absoluteUrl } from "@/lib/seo";
+import { JsonLd } from "@/components/seo/JsonLd";
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -128,14 +129,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       data-scroll-behavior="smooth"
     >
       <body className="flex min-h-screen flex-col font-sans antialiased">
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: safeJsonLd(orgJsonLd) }}
-        />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: safeJsonLd(siteJsonLd) }}
-        />
+        <JsonLd id="ld-organization" data={orgJsonLd} />
+        <JsonLd id="ld-website" data={siteJsonLd} />
         <AppProviders>
           <a
             href="#main-content"

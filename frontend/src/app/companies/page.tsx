@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getSeoCompanies } from "@/lib/api";
-import { absoluteUrl, buildBreadcrumbJsonLd, safeJsonLd } from "@/lib/seo";
+import { absoluteUrl, buildBreadcrumbJsonLd } from "@/lib/seo";
+import { JsonLd } from "@/components/seo/JsonLd";
 
 export const revalidate = 3600;
 
@@ -36,14 +37,8 @@ export default async function CompaniesHubPage() {
   };
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: safeJsonLd(buildBreadcrumbJsonLd(breadcrumb)) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: safeJsonLd(collectionLd) }}
-      />
+      <JsonLd id="ld-companies-crumb" data={buildBreadcrumbJsonLd(breadcrumb)} />
+      <JsonLd id="ld-companies-collection" data={collectionLd} />
       <h1 className="font-display text-3xl font-semibold text-ink">Companies with fresh roles</h1>
       <p className="mt-3 max-w-2xl text-muted">
         Companies that currently have enough active jobs in the freshness window to earn a
